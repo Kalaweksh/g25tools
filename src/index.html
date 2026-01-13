@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Modern Admixture JS (Tabbed)</title>
+<link href="style.css" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['ui-sans-serif','system-ui','-apple-system','Segoe UI','Roboto','Inter','Helvetica','Arial','Noto Sans','Apple Color Emoji','Segoe UI Emoji'],
+            mono: ['ui-monospace','SFMono-Regular','Menlo','Monaco','Consolas','Liberation Mono','Courier New','monospace']
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="min-h-screen flex flex-col bg-zinc-950 text-zinc-100 antialiased">
+<header class="sticky top-0 z-50 border-b border-zinc-800 bg-zinc-950/85 backdrop-blur">
+<div class="mx-auto max-w-6xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+<div class="flex items-center gap-3">
+<!-- Primary Tabs (moved into sticky header, left-aligned) -->
+<nav aria-label="Primary" class="flex items-center gap-1 p-1 rounded-2xl border border-zinc-800 bg-zinc-950/40">
+<button aria-selected="true" class="tab-btn px-3 py-2 rounded-xl text-sm font-semibold tracking-wide hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60 transition active bg-cyan-400 text-zinc-950 shadow" data-tab="data">DATA</button><button aria-selected="false" class="tab-btn px-3 py-2 rounded-xl text-sm font-semibold tracking-wide text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60 transition" data-tab="model">MODEL</button>
+<button aria-selected="false" class="tab-btn px-3 py-2 rounded-xl text-sm font-semibold tracking-wide text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60 transition" data-tab="analysis">ANALYSIS</button>
+</nav>
+<div class="flex items-center gap-3">
+<div class="text-base md:text-lg font-bold tracking-tight text-zinc-100">Vahaduo Modern</div>
+<div class="hidden md:block text-xs text-zinc-400">G25-style utilities: distance • mixture • PCA • clustering</div>
+</div>
+</div>
+<div class="flex flex-wrap items-center gap-2">
+<span class="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-1 text-xs text-zinc-200">
+<span class="text-zinc-400">Sources</span><span class="font-semibold" id="statSources">—</span>
+</span>
+<span class="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-1 text-xs text-zinc-200">
+<span class="text-zinc-400">Targets</span><span class="font-semibold" id="statTargets">—</span>
+</span>
+<span class="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-1 text-xs text-zinc-200">
+<span class="text-zinc-400">Dims</span><span class="font-semibold" id="statDims">—</span>
+</span>
+<span class="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-1 text-xs">
+<span class="h-2.5 w-2.5 rounded-full bg-cyan-400/90" id="statDot"></span>
+<span class="text-zinc-200 font-semibold" id="statStatus">Not loaded</span>
+</span>
+</div>
+</div>
+</header>
+<div class="mx-auto w-full max-w-6xl px-4 py-6 flex-1 flex flex-col">
+<header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+<div class="space-y-1">
+<h1>Modern Admixture JS</h1>
+<p class="text-zinc-300/80">Vahaduo-style workflow: <strong>DATA</strong> → <strong>MODEL</strong> → <strong>ANALYSIS</strong></p>
+</div>
+<div class="">
+<span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold border border-amber-400/50 text-amber-200 bg-amber-950/40" id="dataStatus" title="Load data in the DATA tab">Data: not loaded</span>
+</div>
+</header>
+<main class="space-y-6 flex-1 flex flex-col">
+<!-- TAB 1: DATA -->
+<section class="tab-panel active" id="tab-data" role="tabpanel">
+<div class="text-base font-semibold mb-3">
+<h2>DATA</h2>
+<p class="text-zinc-300/80">Upload/paste sources and targets. Nothing is computed until you press <strong>Load into workspace</strong>.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="rounded-2xl border border-zinc-800 bg-zinc-950/50 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+<div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+  <div class="flex items-center gap-2">
+    <h3>Source</h3>
+    <span class="relative inline-flex items-center group">
+      <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/60 text-[11px] font-bold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60" aria-describedby="tt-source-format" aria-label="Source input format help">?</button>
+      <span id="tt-source-format" role="tooltip" class="pointer-events-none absolute left-0 top-full z-50 mt-2 w-80 rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs text-zinc-200 shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+        CSV format: <span class="font-mono">Name,x1,x2,...</span> (one row per source).
+      </span>
+    </span>
+  </div>
+</div>
+<textarea class="font-mono text-sm w-full min-h-[320px] md:min-h-[420px] p-3 rounded-xl border border-zinc-800 bg-zinc-950/60 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-cyan-400/40 resize-y" id="sourceData" placeholder="PopA,0.1,0.2,0.3
+PopB,0.05,0.12,0.09"></textarea>
+<div class="flex flex-wrap items-center gap-3">
+<input accept=".csv,.txt" id="sourceFile" type="file"/>
+<button class="btn inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold bg-cyan-400 text-zinc-950 hover:bg-cyan-300 active:scale-[0.99] transition btn-ghost border border-zinc-700 text-zinc-100 hover:bg-zinc-900/60" id="clearSource">Clear</button>
+</div>
+<div class="text-xs text-zinc-400" id="sourcePreview"></div>
+</div>
+<div class="rounded-2xl border border-zinc-800 bg-zinc-950/50 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+<div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+  <div class="flex items-center gap-2">
+    <h3>Target</h3>
+    <span class="relative inline-flex items-center group">
+      <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/60 text-[11px] font-bold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60" aria-describedby="tt-target-format" aria-label="Target input format help">?</button>
+      <span id="tt-target-format" role="tooltip" class="pointer-events-none absolute left-0 top-full z-50 mt-2 w-80 rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs text-zinc-200 shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+        CSV format: <span class="font-mono">Name,x1,x2,...</span> (one row per target).
+      </span>
+    </span>
+  </div>
+</div>
+<textarea class="font-mono text-sm w-full min-h-[320px] md:min-h-[420px] p-3 rounded-xl border border-zinc-800 bg-zinc-950/60 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-cyan-400/40 resize-y" id="targetData" placeholder="Ind1,0.12,0.14,0.07
+Ind2,0.055,0.16,0.10"></textarea>
+<div class="flex flex-wrap items-center gap-3">
+<input accept=".csv,.txt" id="targetFile" type="file"/>
+<button class="btn inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold bg-cyan-400 text-zinc-950 hover:bg-cyan-300 active:scale-[0.99] transition btn-ghost border border-zinc-700 text-zinc-100 hover:bg-zinc-900/60" id="clearTarget">Clear</button>
+</div>
+<div class="text-xs text-zinc-400" id="targetPreview"></div>
+</div>
+</div>
+<div class="rounded-2xl border border-zinc-800 bg-zinc-950/50 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+<div class="flex flex-wrap items-center gap-3 justify-between">
+<div class="flex items-center gap-2">
+  <h3>Workspace</h3>
+  <span class="relative inline-flex items-center group">
+    <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/60 text-[11px] font-bold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60" aria-describedby="tt-workspace" aria-label="Workspace help">?</button>
+    <span id="tt-workspace" role="tooltip" class="pointer-events-none absolute left-0 top-full z-50 mt-2 w-96 rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs text-zinc-200 shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+      Parses inputs, validates dimensionality, and caches vectors for the MODEL and ANALYSIS tabs.
+    </span>
+  </span>
+</div>
+<div class="flex flex-wrap items-center gap-3">
+<button class="btn inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold bg-cyan-400 text-zinc-950 hover:bg-cyan-300 active:scale-[0.99] transition" id="loadWorkspace">Load into workspace</button>
+<button class="btn inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold bg-cyan-400 text-zinc-950 hover:bg-cyan-300 active:scale-[0.99] transition btn-ghost border border-zinc-700 text-zinc-100 hover:bg-zinc-900/60" id="resetWorkspace">Reset workspace</button>
+</div>
+</div>
+<div class="notice notice-warn" id="dataErrors" style="display:none"></div>
+</div>
+</section>
+<!-- TAB 2: MODEL -->
+<section class="tab-panel" id="tab-model" role="tabpanel">
+<div class="text-lg font-semibold mb-3">
+<h2>MODEL</h2>
+<p class="text-zinc-300/80">Compute distances and admixture proportions from the loaded workspace.</p>
+</div>
+<div class="notice notice-warn" id="modelGate">
+        Load data in the <strong>DATA</strong> tab to enable modelling.
+      </div>
+<div id="modelContent" style="display:none">
+<!-- Secondary tabs within MODEL -->
+<div aria-label="Model sub-tabs" class="subtabs flex gap-2 mb-4 p-1 rounded-2xl border border-zinc-800 bg-zinc-950/40">
+<button class="subtab-btn px-3 py-2 rounded-xl text-sm font-semibold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 transition active" data-subtab="distance">Distance</button>
+<button class="subtab-btn px-3 py-2 rounded-xl text-sm font-semibold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 transition" data-subtab="mixture">Mixture</button>
+</div>
+<!-- Distance -->
+<div class="subtab-panel active" id="subtab-distance">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start"><div class="rounded-2xl border border-zinc-800 bg-zinc-950/50 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] lg:col-span-4 lg:sticky lg:top-20">
+<div class="flex flex-wrap items-center gap-3 justify-between">
+<div class="flex items-center gap-2">
+  <h3>Euclidean Distance</h3>
+  <span class="relative inline-flex items-center group">
+    <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/60 text-[11px] font-bold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60" aria-describedby="tt-distance" aria-label="Distance tool help">?</button>
+    <span id="tt-distance" role="tooltip" class="pointer-events-none absolute left-0 top-full z-50 mt-2 w-96 rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs text-zinc-200 shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+      Computes Euclidean distance between a selected target and all sources in the loaded workspace.
+    </span>
+  </span>
+</div>
+<div class="flex flex-wrap items-center gap-3">
+<button class="btn inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold bg-cyan-400 text-zinc-950 hover:bg-cyan-300 active:scale-[0.99] transition" id="runDistance">Compute</button>
+<button class="btn inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold bg-cyan-400 text-zinc-950 hover:bg-cyan-300 active:scale-[0.99] transition btn-ghost border border-zinc-700 text-zinc-100 hover:bg-zinc-900/60" id="clearDistance">Clear</button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<label class="flex flex-col gap-1">
+<span>Target</span>
+<select id="distanceTarget"></select>
+</label>
+<details class="rounded-xl border border-zinc-800 bg-zinc-950/40 p-3">
+<summary class="cursor-pointer select-none font-semibold text-zinc-100 flex items-center justify-between gap-3 flex-wrap">
+  <span>Options</span>
+  <span class="relative inline-flex items-center group">
+    <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/60 text-[11px] font-bold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60" aria-describedby="tt-distance-options" aria-label="Distance options help">?</button>
+    <span id="tt-distance-options" role="tooltip" class="pointer-events-none absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs text-zinc-200 shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+      Configure how many nearest sources to show (Top N) and whether to aggregate source names by prefix (split on ':').
+    </span>
+  </span>
+</summary>
+<div class="mt-3 grid grid-cols-1 gap-3">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+<label class="flex flex-col gap-1 w-full min-w-0">
+<span class="text-xs text-zinc-300 whitespace-normal break-words">Top N sources</span>
+<input class="w-full min-w-[12ch] font-mono tabular-nums" id="distanceTopN" min="1" type="number" value="25"/>
+</label>
+<label class="flex flex-col gap-1 min-w-0">
+<span class="text-xs text-zinc-300 whitespace-normal break-words">Aggregate source names</span>
+<select class="w-full" id="distanceAggregate">
+<option selected="" value="yes">Yes (split on ':')</option>
+<option value="no">No</option>
+</select>
+</label>
+</div>
+</div>
+</details>
+</div>
+</div><div class="rounded-2xl border border-zinc-800 bg-zinc-950/50 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] lg:col-span-8 flex flex-col min-h-[520px]">
+<h3>Distance Output</h3>
+<div class="mt-3 grow overflow-auto" id="distanceOutput"></div>
+</div></div></div>
+<!-- Mixture -->
+<div class="subtab-panel" id="subtab-mixture">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start"><div class="rounded-2xl border border-zinc-800 bg-zinc-950/50 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] lg:col-span-4 lg:sticky lg:top-20">
+<div class="flex flex-wrap items-center gap-3 justify-between">
+<div class="flex items-center gap-2">
+  <h3>Mixture Modelling</h3>
+  <span class="relative inline-flex items-center group">
+    <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/60 text-[11px] font-bold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60" aria-describedby="tt-mixture" aria-label="Mixture solver help">?</button>
+    <span id="tt-mixture" role="tooltip" class="pointer-events-none absolute left-0 top-full z-50 mt-2 w-[28rem] rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs text-zinc-200 shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+      Vahaduo-style stochastic solver: allocates discrete <span class="font-semibold">slots</span> (weight granularity) across sources, then locally improves the fit.
+    </span>
+  </span>
+</div>
+<div class="flex flex-wrap items-center gap-3">
+<button class="btn inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold bg-cyan-400 text-zinc-950 hover:bg-cyan-300 active:scale-[0.99] transition" id="runSingle">Run single</button>
+<button class="btn inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold bg-cyan-400 text-zinc-950 hover:bg-cyan-300 active:scale-[0.99] transition" id="runMulti">Run multi</button>
+<button class="btn inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold bg-cyan-400 text-zinc-950 hover:bg-cyan-300 active:scale-[0.99] transition btn-ghost border border-zinc-700 text-zinc-100 hover:bg-zinc-900/60" id="clearMixture">Clear</button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4" style="margin-top:12px">
+<label class="flex flex-col gap-1">
+  <span class="inline-flex items-center gap-2">
+    Single target
+    <span class="relative inline-flex items-center group">
+      <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/60 text-[11px] font-bold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60" aria-describedby="tt-single-target" aria-label="Single target help">?</button>
+      <span id="tt-single-target" role="tooltip" class="pointer-events-none absolute left-0 top-full z-50 mt-2 w-80 rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs text-zinc-200 shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+        Used by <span class="font-semibold">Run single</span>. <span class="font-semibold">Run multi</span> runs all targets and ignores this selection.
+      </span>
+    </span>
+  </span>
+  <select id="mixtureTarget"></select>
+</label>
+<div class="grid grid-cols-1 gap-3 mt-3">
+<label class="flex flex-col gap-1">
+  <span class="inline-flex items-center gap-2">
+    Preset
+    <span class="relative inline-flex items-center group">
+      <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/60 text-[11px] font-bold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60" aria-describedby="tt-mix-preset" aria-label="Preset help">?</button>
+      <span id="tt-mix-preset" role="tooltip" class="pointer-events-none absolute left-0 top-full z-50 mt-2 w-[28rem] rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs text-zinc-200 shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+        Presets configure recommended defaults for <span class="font-semibold">slots</span> (weight resolution), <span class="font-semibold">cycles</span> (search depth), and importance settings.
+      </span>
+    </span>
+  </span>
+  <select class="min-h-[42px]" id="mixPreset">
+<option selected="" value="balanced">Balanced (recommended)</option>
+<option value="fast">Fast</option>
+<option value="thorough">Thorough</option>
+<option value="custom">Custom</option>
+</select>
+</label>
+
+</div>
+<details class="mt-4 rounded-xl border border-zinc-800 bg-zinc-950/40 p-3">
+<summary class="cursor-pointer select-none font-semibold text-zinc-100 flex items-center justify-between gap-3 flex-wrap">
+  <span>Solver &amp; output options</span>
+  <span class="relative inline-flex items-center group">
+    <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/60 text-[11px] font-bold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60" aria-describedby="tt-mix-solver-options" aria-label="Mixture solver options help">?</button>
+    <span id="tt-mix-solver-options" role="tooltip" class="pointer-events-none absolute left-0 top-full z-50 mt-2 w-[28rem] rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs text-zinc-200 shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+      Slots control weight resolution (1/slots). Cycles control search depth. Aggregate collapses sources by prefix. Print zeroes shows 0% rows. Verbose prints run metadata.
+    </span>
+  </span>
+</summary>
+<div class="mt-3">
+<div class="grid grid-cols-1 gap-3">
+<label class="flex flex-col gap-1 min-w-0">
+<span class="text-xs text-zinc-300 whitespace-normal break-words">Slots</span>
+<input
+  class="w-full min-w-[12ch] font-mono tabular-nums"
+  id="slots"
+  type="number"
+  min="100"
+  step="500"
+  value="2000"
+/>
+</label>  
+<label class="flex flex-col gap-1 min-w-0">
+<span class="text-xs text-zinc-300 whitespace-normal break-words">Cycles multiplier</span>
+<input
+  class="w-full min-w-[12ch] font-mono tabular-nums"
+  id="cycles"
+  type="number"
+  min="50"
+  step="50"
+  value="500"
+/></label>
+<label class="flex flex-col gap-1 min-w-0">
+<span class="text-xs text-zinc-300 whitespace-normal break-words">Print zeroes</span>
+<select class="w-full" id="printZeroes">
+<option selected="" value="no">No</option>
+<option value="yes">Yes</option>
+</select>
+</label>
+<label class="flex flex-col gap-1 min-w-0">
+<span class="text-xs text-zinc-300 whitespace-normal break-words">Aggregate</span>
+<select class="w-full" id="aggregate">
+<option selected="" value="yes">Yes (split on ':')</option>
+<option value="no">No</option>
+</select>
+</label>
+<label class="flex flex-col gap-1 min-w-0">
+<span class="text-xs text-zinc-300 whitespace-normal break-words">Verbose</span>
+<select class="w-full" id="verbose">
+<option selected="" value="no">No</option>
+<option value="yes">Yes  (Output run metadata)</option>
+</select>
+</label>
+</div>
+</div>
+</details>
+<details class="mt-3 rounded-xl border border-zinc-800 bg-zinc-950/40 p-3">
+<summary class="cursor-pointer select-none font-semibold text-zinc-100 flex items-center justify-between gap-3 flex-wrap">
+  <span>Permutation importance</span>
+  <span class="relative inline-flex items-center group">
+    <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/60 text-[11px] font-bold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60" aria-describedby="tt-perm-importance" aria-label="Permutation importance help">?</button>
+    <span id="tt-perm-importance" role="tooltip" class="pointer-events-none absolute left-0 top-full z-50 mt-2 w-[28rem] rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs text-zinc-200 shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+      Adds an optional importance column: for each source, randomly permutes its coordinates and reports the increase in distance (Δdist). Higher Δdist implies a more structurally necessary component.
+    </span>
+  </span>
+</summary>
+<div class="mt-3">
+<div class="grid grid-cols-1 gap-3" style="margin-top:12px">
+<label class="flex flex-col gap-1 min-w-0">
+<span class="text-xs text-zinc-300 whitespace-normal break-words">Permutation importance</span>
+<div class="flex flex-wrap items-center gap-3" style="gap:10px; align-items:center">
+<input class="w-full" id="mixImportance" type="checkbox" checked/>
+</div>
+</label><label class="flex flex-col gap-1 w-full min-w-0">
+<span class="text-xs text-zinc-300 whitespace-normal break-words">Permutations per source</span>
+<input class="w-full min-w-[10ch] font-mono tabular-nums" id="mixImpPerms" min="1" type="number" value="3"/>
+</label><label class="flex flex-col gap-1 w-full min-w-0">
+<span class="text-xs text-zinc-300 whitespace-normal break-words">Only score used sources</span>
+<select class="w-full" id="mixImpUsedOnly">
+<option selected="" value="yes">Yes</option>
+<option value="no">No</option>
+</select>
+</label></div>
+</div></details>
+</div>
+</div><div class="rounded-2xl border border-zinc-800 bg-zinc-950/50 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] lg:col-span-8 flex flex-col min-h-[520px]">
+<h3>Mixture Output</h3>
+<div class="mt-3 grow overflow-auto" id="mixtureOutput"></div>
+</div></div></div>
+</div>
+</section>
+<!-- TAB 3: ANALYSIS -->
+<section class="tab-panel" id="tab-analysis" role="tabpanel">
+<div class="text-lg font-semibold mb-3">
+<h2>ANALYSIS</h2>
+<p class="text-zinc-300/80">PCA plotting and clustering on the loaded workspace.</p>
+</div>
+<div class="notice notice-warn" id="analysisGate">
+        Load data in the <strong>DATA</strong> tab to enable analysis.
+      </div>
+<div id="analysisContent" style="display:none">
+<div aria-label="Analysis sub-tabs" class="subtabs flex gap-2 mb-4 p-1 rounded-2xl border border-zinc-800 bg-zinc-950/40">
+<button class="subtab-btn px-3 py-2 rounded-xl text-sm font-semibold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 transition active" data-subtab="pca">PCA</button>
+<button class="subtab-btn px-3 py-2 rounded-xl text-sm font-semibold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 transition" data-subtab="cluster">Clustering</button>
+</div>
+<!-- PCA -->
+<div class="subtab-panel active" id="subtab-pca">
+<div class="rounded-2xl border border-zinc-800 bg-zinc-950/50 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+<div class="flex flex-wrap items-center gap-3 justify-between">
+<div class="flex items-center gap-2">
+  <h3>PCA</h3>
+  <span class="relative inline-flex items-center group">
+    <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/60 text-[11px] font-bold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60" aria-describedby="tt-pca" aria-label="PCA help">?</button>
+    <span id="tt-pca" role="tooltip" class="pointer-events-none absolute left-0 top-full z-50 mt-2 w-[28rem] rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs text-zinc-200 shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+      Computes principal components on the combined source+target matrix (mean-centered) and plots the selected axes.
+    </span>
+  </span>
+</div>
+<div class="flex flex-wrap items-center gap-3">
+<button class="btn inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold bg-cyan-400 text-zinc-950 hover:bg-cyan-300 active:scale-[0.99] transition" id="computePCA">Compute PCA</button>
+<button class="btn inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold bg-cyan-400 text-zinc-950 hover:bg-cyan-300 active:scale-[0.99] transition btn-ghost border border-zinc-700 text-zinc-100 hover:bg-zinc-900/60" id="resetView">Reset view</button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<label class="flex flex-col gap-1">
+<span>PC X</span>
+<select class="px-3 py-2 rounded-xl border border-zinc-800 bg-zinc-950/60 text-zinc-100" id="pcaX"></select>
+</label>
+<label class="flex flex-col gap-1">
+<span>PC Y</span>
+<select class="px-3 py-2 rounded-xl border border-zinc-800 bg-zinc-950/60 text-zinc-100" id="pcaY"></select>
+</label>
+</div>
+<details class="mt-4 rounded-xl border border-zinc-800 bg-zinc-950/40 p-3">
+<summary class="cursor-pointer select-none font-semibold text-zinc-100 flex items-center justify-between">
+  <span>Options</span>
+  <span class="relative inline-flex items-center group">
+    <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/60 text-[11px] font-bold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60" aria-describedby="tt-pca-options" aria-label="PCA options help">?</button>
+    <span id="tt-pca-options" role="tooltip" class="pointer-events-none absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs text-zinc-200 shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+      Choose colouring mode and whether to display sources, targets, or both.
+    </span>
+  </span>
+</summary>
+<div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+<label class="flex flex-col gap-1">
+<span>Colour</span>
+<select class="px-3 py-2 rounded-xl border border-zinc-800 bg-zinc-950/60 text-zinc-100" id="pcaColour">
+<option selected="" value="kind">Source vs Target</option>
+<option value="cluster">Clusters (if present)</option>
+</select>
+</label>
+<label class="flex flex-col gap-1">
+<span>Show</span>
+<select class="px-3 py-2 rounded-xl border border-zinc-800 bg-zinc-950/60 text-zinc-100" id="pcaShow">
+<option selected="" value="both">Sources + Targets</option>
+<option value="sources">Sources only</option>
+<option value="targets">Targets only</option>
+</select>
+</label>
+</div>
+</details>
+<div class="text-xs text-zinc-400 text-zinc-300/80" id="pcaVariance"></div>
+</div>
+<div class="rounded-2xl border border-zinc-800 bg-zinc-950/50 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+<div class="mt-3 rounded-2xl border border-zinc-800 bg-zinc-950/30 p-2">
+<canvas height="600" id="pcaCanvas" width="1000"></canvas>
+<div class="plot-legend" id="pcaLegend"></div>
+</div>
+<div class="text-xs text-zinc-400 text-zinc-300/80 flex items-center gap-2">
+  <span>Tip</span>
+  <span class="relative inline-flex items-center group">
+    <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/60 text-[11px] font-bold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60" aria-describedby="tt-pca-tip" aria-label="PCA plot interaction help">?</button>
+    <span id="tt-pca-tip" role="tooltip" class="pointer-events-none absolute left-0 top-full z-50 mt-2 w-80 rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs text-zinc-200 shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+      Mouse-wheel to zoom, drag to pan, and hover points to see labels.
+    </span>
+  </span>
+</div>
+</div>
+</div>
+<!-- Clustering -->
+<div class="subtab-panel" id="subtab-cluster">
+<div class="rounded-2xl border border-zinc-800 bg-zinc-950/50 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+<div class="flex flex-wrap items-center gap-3 justify-between">
+<div class="flex items-center gap-2">
+  <h3>Clustering</h3>
+  <span class="relative inline-flex items-center group">
+    <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/60 text-[11px] font-bold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60" aria-describedby="tt-cluster" aria-label="Clustering help">?</button>
+    <span id="tt-cluster" role="tooltip" class="pointer-events-none absolute left-0 top-full z-50 mt-2 w-[28rem] rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs text-zinc-200 shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+      Runs k-means or hierarchical (Ward) clustering in either PCA space (2D) or the original G25 coordinate space.
+    </span>
+  </span>
+</div>
+<div class="flex flex-wrap items-center gap-3">
+<button class="btn inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold bg-cyan-400 text-zinc-950 hover:bg-cyan-300 active:scale-[0.99] transition" id="runKMeans">Run clustering</button>
+<button class="btn inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold bg-cyan-400 text-zinc-950 hover:bg-cyan-300 active:scale-[0.99] transition btn-ghost border border-zinc-700 text-zinc-100 hover:bg-zinc-900/60" id="clearClusters">Clear</button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+<label class="flex flex-col gap-1">
+<span>Algorithm</span>
+<select id="clusterAlg">
+<option selected="" value="kmeans">k-means</option>
+<option value="hier_ward">Hierarchical (Ward)</option>
+</select>
+</label>
+<label class="flex flex-col gap-1">
+<span>k</span>
+<input id="kValue" min="2" type="number" value="6"/>
+</label>
+<details class="md:col-span-2 mt-2 rounded-xl border border-zinc-800 bg-zinc-950/40 p-3">
+<summary class="cursor-pointer select-none font-semibold text-zinc-100 flex items-center justify-between">
+  <span>Advanced</span>
+  <span class="relative inline-flex items-center group">
+    <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/60 text-[11px] font-bold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60" aria-describedby="tt-cluster-advanced" aria-label="Clustering advanced options help">?</button>
+    <span id="tt-cluster-advanced" role="tooltip" class="pointer-events-none absolute right-0 top-full z-50 mt-2 w-[28rem] rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs text-zinc-200 shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+      Include selects which points are clustered. Space selects PCA (2D) or original G25 space. Restarts controls k-means initialisations.
+    </span>
+  </span>
+</summary>
+<div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+<label class="flex flex-col gap-1">
+<span>Include</span>
+<select id="clusterInclude">
+<option selected="" value="both">Sources + Targets</option>
+<option value="sources">Sources only</option>
+<option value="targets">Targets only</option>
+</select>
+</label>
+<label class="flex flex-col gap-1">
+<span>Space</span>
+<select id="clusterSpace">
+<option selected="" value="pca2d">PCA (selected axes)</option>
+<option value="g25d">Original 25D</option>
+</select>
+</label>
+</div>
+<div class="mt-3">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4" style="margin-top:12px">
+<label class="flex flex-col gap-1">
+<span>Restarts (k-means)</span>
+<input id="kRestarts" min="1" type="number" value="5"/>
+</label>
+<div class="text-zinc-300/80 flex items-center gap-2" style="align-self:end">
+  <span>Point limit</span>
+  <span class="relative inline-flex items-center group">
+    <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/60 text-[11px] font-bold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60" aria-describedby="tt-ward-limit" aria-label="Hierarchical clustering limit help">?</button>
+    <span id="tt-ward-limit" role="tooltip" class="pointer-events-none absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs text-zinc-200 shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+      Ward hierarchical clustering scales cubically with sample size, so it is restricted to a limited number of points.
+    </span>
+  </span>
+</div>
+</div>
+</div></details>
+</div>
+</div>
+</div>
+<div class="rounded-2xl border border-zinc-800 bg-zinc-950/50 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+<h3>Cluster Summary</h3>
+<div id="clusterOutput"></div>
+</div>
+<div class="rounded-2xl border border-zinc-800 bg-zinc-950/50 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]" id="dendrogramCard">
+<div class="flex flex-wrap items-center gap-3 justify-between">
+<div class="flex items-center gap-2">
+  <h3>Dendrogram</h3>
+  <span class="relative inline-flex items-center group">
+    <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/60 text-[11px] font-bold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60" aria-describedby="tt-dendro" aria-label="Dendrogram help">?</button>
+    <span id="tt-dendro" role="tooltip" class="pointer-events-none absolute left-0 top-full z-50 mt-2 w-80 rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs text-zinc-200 shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+      Displayed for Hierarchical (Ward) runs only.
+    </span>
+  </span>
+</div>
+<div class="flex flex-wrap items-center gap-3">
+<label class="flex flex-wrap items-center gap-3" style="gap:8px">
+<input checked="" id="dendroLabels" type="checkbox"/>
+<span class="text-zinc-300/80">Show labels (≤ 40 points)</span>
+</label>
+</div>
+</div>
+<div class="mt-3 rounded-2xl border border-zinc-800 bg-zinc-950/30 p-2">
+<canvas height="320" id="dendrogramCanvas" width="900"></canvas>
+</div>
+<div class="text-xs text-zinc-400 text-zinc-300/80" id="dendroNote"></div>
+</div>
+</div>
+</section>
+</main>
+<footer class="app-footer mt-auto pt-6 border-t border-zinc-800">
+<p class="text-zinc-300/80">Refactor target: Vahaduo-style tab separation. 
+  This build is dependency-free and runs fully client-side.</p>
+</footer>
+</div>
+<script type="module" src="./scripts/analysis/cluster.js"></script>
+<script type="module" src="./scripts/analysis/pca.js"></script>
+<script type="module" src="./scripts/analysis/plot.js"></script>
+<script type="module" src="./scripts/model/distance.js"></script>
+<script type="module" src="./scripts/model/mixture.js"></script>
+<script type="module" src="./scripts/main.js"></script>
+
+</body>
+</html>
