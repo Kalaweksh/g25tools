@@ -9,15 +9,12 @@
 
   Notes:
   - Mixture modelling uses a simplified slot-based Monte-Carlo local search inspired by Vahaduo.
-  - PCA uses covariance matrix + power iteration/deflation to extract top PCs (good for small d ~ 25).
-  - Clustering uses k-means on selected PCA axes.
+
 */
 import * as distance from './model/distance.js'
 import * as mixture from './model/mixture.js'
 
-import * as cluster from './analysis/cluster.js'
-import * as pca from './analysis/pca.js'
-import * as plot from './analysis/plot.js'
+
 
 
   // ----------------------------
@@ -28,17 +25,11 @@ import * as plot from './analysis/plot.js'
     dimensions: 0,
     source: null, // {rows, names, vectors}
     target: null, // {rows, names, vectors}
-    pca: null,    // {scores: n x m, pcs: d x m, evals: m, labels: n, kind: n}
     view: {
       tab: 'data',
       modelSubtab: 'distance',
-      analysisSubtab: 'pca',
-      // PCA view transform
-      panX: 0,
-      panY: 0,
-      zoom: 1,
+
     },
-    cluster: null, // {k, labels: n, include, axesKey}
   };
 
   // ----------------------------
@@ -251,11 +242,9 @@ import * as plot from './analysis/plot.js'
       state.source = rowsToData(sRows);
       state.target = rowsToData(tRows);
       state.loaded = true;
-      state.pca = null;
       state.cluster = null;
       updateWorkspaceUI();
       distance.hydrateModelControls();
-      pca.hydrateAnalysisControls();
       // Gate panels
       hide($('modelGate'));
       show($('modelContent'));
@@ -281,7 +270,6 @@ import * as plot from './analysis/plot.js'
     state.dimensions = 0;
     state.source = null;
     state.target = null;
-    state.pca = null;
     state.cluster = null;
     updateWorkspaceUI();
 
@@ -386,20 +374,6 @@ import * as plot from './analysis/plot.js'
     $('runMulti').addEventListener('click', () => mixture.runMixture(false));
     $('clearMixture').addEventListener('click', () => setHTML($('mixtureOutput'), ''));
 
-    // Analysis: PCA
-    // $('computePCA').addEventListener('click', computePCA);
-    // $('resetView').addEventListener('click', resetView);
-    // $('pcaX').addEventListener('change', () => { if (state.cluster) state.cluster = null; drawDendrogram(null);
-    //   renderPCA(); renderClusterSummary(); });
-    // $('pcaY').addEventListener('change', () => { if (state.cluster) state.cluster = null; renderPCA(); renderClusterSummary(); });
-    // $('pcaShow').addEventListener('change', renderPCA);
-    // $('pcaColour').addEventListener('change', renderPCA);
-
-    // // Analysis: clustering
-    // $('runKMeans').addEventListener('click', runKMeans);
-    // $('clearClusters').addEventListener('click', clearClusters);
-
-    // initCanvasInteractions();
 
     // Initial gates
     updateWorkspaceUI();
