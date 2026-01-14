@@ -193,12 +193,8 @@ import * as mixture from './model/mixture.js'
     qsa(group === 'model' ? '#tab-model .subtab-panel' : '#tab-analysis .subtab-panel').forEach(p => p.classList.remove('active'));
     $(panelPrefix + subName).classList.add('active');
 
-    // Ensure dendrogram never appears outside the clustering subtab
-    if (group === 'analysis' && subName !== 'cluster') {
-      drawDendrogram(null);
-    }
-  }
 
+  }
   
   // ----------------------------
   // Presets
@@ -242,14 +238,12 @@ import * as mixture from './model/mixture.js'
       state.source = rowsToData(sRows);
       state.target = rowsToData(tRows);
       state.loaded = true;
-      state.cluster = null;
       updateWorkspaceUI();
       distance.hydrateModelControls();
       // Gate panels
       hide($('modelGate'));
       show($('modelContent'));
-      hide($('analysisGate'));
-      show($('analysisContent'));
+
       // Update status badge
       const badge = $('dataStatus');
       badge.classList.remove('badge-warn');
@@ -270,14 +264,12 @@ import * as mixture from './model/mixture.js'
     state.dimensions = 0;
     state.source = null;
     state.target = null;
-    state.cluster = null;
     updateWorkspaceUI();
 
     // Gate panels
     show($('modelGate'));
     hide($('modelContent'));
-    show($('analysisGate'));
-    hide($('analysisContent'));
+
 
     // Badge
     const badge = $('dataStatus');
@@ -289,7 +281,6 @@ import * as mixture from './model/mixture.js'
     // Clear outputs
     setHTML($('distanceOutput'), '');
     setHTML($('mixtureOutput'), '');
-    setHTML($('clusterOutput'), '');
     clearCanvas();
   }
 
@@ -375,18 +366,12 @@ import * as mixture from './model/mixture.js'
     $('clearMixture').addEventListener('click', () => setHTML($('mixtureOutput'), ''));
 
 
+
     // Initial gates
     updateWorkspaceUI();
     show($('modelGate'));
     hide($('modelContent'));
-    show($('analysisGate'));
-    hide($('analysisContent'));
 
-    // Analysis: dendrogram options
-    // const dl = $('dendroLabels');
-    // if (dl) dl.addEventListener('change', () => {
-    //   if (state.cluster && state.cluster.algorithm === 'hier_ward' && state.cluster.hier) drawDendrogram(state.cluster.hier);
-    // });
 
 
     // Mixture preset
@@ -617,3 +602,5 @@ import * as mixture from './model/mixture.js'
 
 
 init();
+
+
