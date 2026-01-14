@@ -71,7 +71,6 @@ pairs.sort((a, b) => a.dist - b.dist);
 
 const shown = pairs.slice(0, Math.min(topN, pairs.length));
 const table = document.createElement('table');
-table.dataset.rankColumn = '1';
 styleTableEl(table);
 const thead = document.createElement('thead');
 thead.innerHTML = `<tr><th colspan="3">Target: <strong>${escapeHTML(targetName)}</strong> • Showing ${shown.length}/${pairs.length}</th></tr>`;
