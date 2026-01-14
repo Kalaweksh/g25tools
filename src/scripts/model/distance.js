@@ -1,7 +1,7 @@
 // ----------------------------
 // Distance modelling
 // ----------------------------
-import {$, state, clamp, styleTableEl, escapeHTML} from '../main.js'
+import {$, state, clamp, styleTableEl, escapeHTML, makeTableSortable} from '../main.js'
 export function euclidean(a, b) {
 let s = 0;
 for (let i = 0; i < a.length; i++) {
@@ -71,9 +71,13 @@ pairs.sort((a, b) => a.dist - b.dist);
 
 const shown = pairs.slice(0, Math.min(topN, pairs.length));
 const table = document.createElement('table');
+table.dataset.rankColumn = '0';
 styleTableEl(table);
 const thead = document.createElement('thead');
 thead.innerHTML = `<tr><th colspan="3">Target: <strong>${escapeHTML(targetName)}</strong> • Showing ${shown.length}/${pairs.length}</th></tr>`;
+const labelRow = document.createElement('tr');
+labelRow.innerHTML = '<th class="number">Rank</th><th>Source</th><th class="number">Distance</th>';
+thead.appendChild(labelRow);
 table.appendChild(thead);
 
 const tbody = document.createElement('tbody');
@@ -93,6 +97,7 @@ for (const p of shown) {
     tbody.appendChild(tr);
 }
 table.appendChild(tbody);
+makeTableSortable(table);
 const out = $('distanceOutput');
 // Accumulate outputs; Clear button removes all previous runs.
 const wrap = document.createElement('div');
