@@ -15,9 +15,6 @@
 import * as distance from './model/distance.js'
 import * as mixture from './model/mixture.js'
 
-import * as cluster from './analysis/cluster.js'
-import * as pca from './analysis/pca.js'
-import * as plot from './analysis/plot.js'
 
 
   // ----------------------------
@@ -50,7 +47,13 @@ import * as plot from './analysis/plot.js'
   export function setHTML(el, html) {
     el.innerHTML = html;
     // Apply Tailwind styling to any injected form controls / tables
-    try { styleFormControls(el); el.querySelectorAll('table').forEach(styleTableEl); } catch (e) {}
+    try {
+      styleFormControls(el);
+      el.querySelectorAll('table').forEach((table) => {
+        styleTableEl(table);
+        makeTableSortable(table);
+      });
+    } catch (e) {}
   }
 
   function show(el) { el.style.display = ''; }
@@ -249,7 +252,7 @@ import * as plot from './analysis/plot.js'
       state.cluster = null;
       updateWorkspaceUI();
       distance.hydrateModelControls();
-      pca.hydrateAnalysisControls();
+      //pca.hydrateAnalysisControls();
       // Gate panels
       hide($('modelGate'));
       show($('modelContent'));
@@ -464,7 +467,7 @@ import * as plot from './analysis/plot.js'
   if (!table) return;
 
   const apply = () => {
-    table.classList.add('w-full', 'text-sm', 'overflow-hidden', 'rounded-2xl', 'border', 'border-zinc-800');
+    table.classList.add('w-full', 'text-sm', 'overflow-hidden', 'rounded-2xl', 'border', 'border-zinc-800', 'table-compact');
     table.querySelectorAll('thead th').forEach(th => {
       th.classList.add('bg-zinc-950', 'text-zinc-300', 'uppercase', 'tracking-wider', 'text-xs', 'font-semibold');
     });
@@ -482,6 +485,158 @@ import * as plot from './analysis/plot.js'
   queueMicrotask(apply);
 }
 
+  function getSortableHeaderRow(table) {
+    const head = table?.tHead;
+    if (!head) return null;
+    const rows = Array.from(head.rows);
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const row = rows[i];
+      const cells = Array.from(row.cells);
+      if (cells.length <= 1) continue;
+      if (cells.some(cell => cell.colSpan > 1)) continue;
+      return row;
+    }
+    return null;
+  }
+
+  function getCellValue(cell) {
+    if (!cell) return '';
+    if (cell.dataset.sortValue != null) return cell.dataset.sortValue;
+    return cell.textContent.trim();
+  }
+
+  function detectNumeric(values) {
+    return values.every(val => val !== '' && !Number.isNaN(Number.parseFloat(val)));
+  }
+
+  export function makeTableSortable(table, options = {}) {
+    if (!table || table.dataset.sortableInitialized) return;
+
+    const fixedColumns = options.fixedColumns ?? Number(table.dataset.fixedColumns ?? 0);
+    const rowSortable = options.rowSortable ?? table.dataset.rowSortable === 'true';
+    const rankColumn = options.rankColumn ?? (table.dataset.rankColumn ? Number(table.dataset.rankColumn) : null);
+
+    const headerRow = getSortableHeaderRow(table);
+    if (!headerRow) return;
+
+    const headers = Array.from(headerRow.cells);
+    headers.forEach((th, index) => {
+      const label = th.textContent.trim();
+      if (!label) return;
+      th.classList.add('sortable');
+      th.setAttribute('aria-sort', 'none');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sort-btn';
+      btn.innerHTML = `<span>${escapeHTML(label)}</span><span class="sort-indicator" aria-hidden="true">↕</span>`;
+      th.textContent = '';
+      th.appendChild(btn);
+      btn.addEventListener('click', () => sortByColumn(index));
+    });
+
+    const tbody = table.tBodies[0];
+    if (!tbody) return;
+
+    const sortByColumn = (index) => {
+      const rows = Array.from(tbody.rows);
+      const fixedRows = rows.filter(row => row.dataset.fixed === 'true' || row.classList.contains('is-summary'));
+      const sortableRows = rows.filter(row => !fixedRows.includes(row));
+
+      const values = sortableRows.map(row => getCellValue(row.cells[index]));
+      const isNumeric = detectNumeric(values);
+
+      const currentDir = headerRow.dataset.sortDir || 'none';
+      const currentIndex = headerRow.dataset.sortIndex ? Number(headerRow.dataset.sortIndex) : null;
+      const nextDir = currentIndex === index && currentDir === 'asc' ? 'desc' : 'asc';
+
+      sortableRows.sort((a, b) => {
+        const aVal = getCellValue(a.cells[index]);
+        const bVal = getCellValue(b.cells[index]);
+        if (isNumeric) {
+          const diff = Number.parseFloat(aVal) - Number.parseFloat(bVal);
+          return nextDir === 'asc' ? diff : -diff;
+        }
+        return nextDir === 'asc'
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      });
+
+      sortableRows.forEach(row => tbody.appendChild(row));
+      fixedRows.forEach(row => tbody.appendChild(row));
+
+      if (rankColumn != null) {
+        const updatedRows = Array.from(tbody.rows).filter(row => !row.classList.contains('is-summary'));
+        updatedRows.forEach((row, idx) => {
+          const cell = row.cells[rankColumn];
+          if (cell) cell.textContent = String(idx + 1);
+        });
+      }
+
+      headers.forEach((th, idx) => {
+        const dir = idx === index ? nextDir : 'none';
+        th.setAttribute('aria-sort', dir === 'none' ? 'none' : dir === 'asc' ? 'ascending' : 'descending');
+        const indicator = th.querySelector('.sort-indicator');
+        if (indicator) indicator.textContent = dir === 'none' ? '↕' : dir === 'asc' ? '↑' : '↓';
+      });
+
+      headerRow.dataset.sortIndex = String(index);
+      headerRow.dataset.sortDir = nextDir;
+    };
+
+    if (rowSortable) {
+      tbody.addEventListener('click', (event) => {
+        const btn = event.target.closest('.row-sort-btn');
+        if (!btn) return;
+        const row = btn.closest('tr');
+        if (!row) return;
+
+        const currentDir = row.dataset.sortDir || 'none';
+        const nextDir = currentDir === 'asc' ? 'desc' : 'asc';
+        row.dataset.sortDir = nextDir;
+        btn.setAttribute('aria-pressed', nextDir === 'asc' ? 'true' : 'false');
+
+        const baseCells = Array.from(row.cells).slice(fixedColumns);
+        const values = baseCells.map(cell => getCellValue(cell));
+        const isNumeric = detectNumeric(values);
+
+        const order = baseCells.map((cell, idx) => ({
+          idx: idx + fixedColumns,
+          value: getCellValue(cell)
+        }));
+
+        order.sort((a, b) => {
+          if (isNumeric) {
+            const diff = Number.parseFloat(a.value) - Number.parseFloat(b.value);
+            return nextDir === 'asc' ? diff : -diff;
+          }
+          return nextDir === 'asc'
+            ? String(a.value).localeCompare(String(b.value))
+            : String(b.value).localeCompare(String(a.value));
+        });
+
+        const rowsToUpdate = [
+          ...(table.tHead ? Array.from(table.tHead.rows) : []),
+          ...Array.from(tbody.rows)
+        ];
+
+        rowsToUpdate.forEach((rowEl) => {
+          const cells = Array.from(rowEl.cells);
+          if (cells.length <= fixedColumns) return;
+          const fixed = cells.slice(0, fixedColumns);
+          const sorted = order.map(item => cells[item.idx]);
+          rowEl.replaceChildren(...fixed, ...sorted);
+        });
+
+        headers.forEach((th) => {
+          th.setAttribute('aria-sort', 'none');
+          const indicator = th.querySelector('.sort-indicator');
+          if (indicator) indicator.textContent = '↕';
+        });
+      });
+    }
+
+    table.dataset.sortableInitialized = 'true';
+  }
+
 
 init();
-
