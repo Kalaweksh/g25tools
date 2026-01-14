@@ -60,6 +60,7 @@ function getMixtureConfig() {
     printZeroes: $('printZeroes')?.value === 'yes',
     doAgg: $('aggregate')?.value === 'yes',
     residualTopN: clamp(Number.parseInt($('mixResidualTopN')?.value ?? '25', 10), 1, 100000),
+    showResiduals: $('mixResidualEnable')?.checked ?? false,
     doImportance: $('mixImportance')?.checked ?? false,
     impPerms: clamp(Number.parseInt($('mixImpPerms')?.value ?? '3', 10), 1, 100000),
     usedOnly: ($('mixImpUsedOnly')?.value ?? 'yes') === 'yes',
@@ -187,7 +188,12 @@ function renderResidualSimilarityTable({targetName, pairs, shownCount, totalCoun
   table.appendChild(thead);
 
   const tbody = document.createElement('tbody');
-  pairs.slice(0, shownCount).forEach((p, idx) => {
+  const shownPairs = pairs.slice(0, shownCount);
+  const simValues = shownPairs.map(p => p.sim);
+  const minSim = Math.min(...simValues);
+  const maxSim = Math.max(...simValues);
+  const span = Math.max(1e-9, maxSim - minSim);
+  shownPairs.forEach((p, idx) => {
     const tr = document.createElement('tr');
     const tdRank = document.createElement('td');
     tdRank.className = 'number';
@@ -197,6 +203,13 @@ function renderResidualSimilarityTable({targetName, pairs, shownCount, totalCoun
     const tdSim = document.createElement('td');
     tdSim.className = 'number';
     tdSim.textContent = p.sim.toFixed(8);
+    const ratio = (p.sim - minSim) / span;
+    const baseAlpha = 0.05 + ratio * 0.25;
+    const strongAlpha = 0.1 + ratio * 0.5;
+    const gradientBase = `linear-gradient(90deg, rgba(59,130,246,${baseAlpha}), rgba(14,116,144,${baseAlpha}))`;
+    tdRank.style.backgroundImage = gradientBase;
+    tdName.style.backgroundImage = gradientBase;
+    tdSim.style.backgroundImage = `linear-gradient(90deg, rgba(34,211,238,0.08), rgba(14,116,144,${strongAlpha}))`;
     tr.appendChild(tdRank);
     tr.appendChild(tdName);
     tr.appendChild(tdSim);
@@ -412,25 +425,27 @@ export async function runMixture(single) {
   for (const result of resultSet.results) {
     if (single) {
       runWrap.appendChild(renderSingleTable(result, {printZeroes: config.printZeroes, showImpCol: result.showImpCol}));
-      const tIdx = config.singleIdx;
-      const residual = computeResidualVector(
-        state.target.vectors[tIdx],
-        state.source.vectors,
-        resultSet.weightsByTarget[0]
-      );
-      const residualPairs = computeResidualSimilarities(
-        residual,
-        state.source.names,
-        state.source.vectors,
-        config.doAgg
-      );
-      const shownCount = Math.min(config.residualTopN, residualPairs.length);
-      runWrap.appendChild(renderResidualSimilarityTable({
-        targetName: result.target,
-        pairs: residualPairs,
-        shownCount,
-        totalCount: residualPairs.length
-      }));
+      if (config.showResiduals) {
+        const tIdx = config.singleIdx;
+        const residual = computeResidualVector(
+          state.target.vectors[tIdx],
+          state.source.vectors,
+          resultSet.weightsByTarget[0]
+        );
+        const residualPairs = computeResidualSimilarities(
+          residual,
+          state.source.names,
+          state.source.vectors,
+          config.doAgg
+        );
+        const shownCount = Math.min(config.residualTopN, residualPairs.length);
+        runWrap.appendChild(renderResidualSimilarityTable({
+          targetName: result.target,
+          pairs: residualPairs,
+          shownCount,
+          totalCount: residualPairs.length
+        }));
+      }
     }
   }
 

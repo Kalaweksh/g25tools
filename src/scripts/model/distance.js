@@ -110,10 +110,10 @@ for (const p of shown) {
     const ratio = (p.dist - minDist) / span;
     const baseAlpha = 0.08 + ratio * 0.2;
     const strongAlpha = 0.15 + ratio * 0.45;
-    const gradientBase = `linear-gradient(90deg, rgba(34,211,238,${baseAlpha}), rgba(14,116,144,${baseAlpha}))`;
+    const gradientBase = `linear-gradient(270deg, rgba(34,211,238,${baseAlpha}), rgba(14,116,144,${baseAlpha}))`;
     tdRank.style.backgroundImage = gradientBase;
     tdName.style.backgroundImage = gradientBase;
-    tdDist.style.backgroundImage = `linear-gradient(90deg, rgba(34,211,238,0.08), rgba(14,116,144,${strongAlpha}))`;
+    tdDist.style.backgroundImage = `linear-gradient(270deg, rgba(34,211,238,0.08), rgba(14,116,144,${strongAlpha}))`;
     tr.appendChild(tdRank);
     tr.appendChild(tdName);
     tr.appendChild(tdDist);
