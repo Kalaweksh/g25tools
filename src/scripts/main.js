@@ -15,9 +15,6 @@
 import * as distance from './model/distance.js'
 import * as mixture from './model/mixture.js'
 
-import * as cluster from './analysis/cluster.js'
-import * as pca from './analysis/pca.js'
-import * as plot from './analysis/plot.js'
 
 
   // ----------------------------
@@ -255,7 +252,7 @@ import * as plot from './analysis/plot.js'
       state.cluster = null;
       updateWorkspaceUI();
       distance.hydrateModelControls();
-      pca.hydrateAnalysisControls();
+      //pca.hydrateAnalysisControls();
       // Gate panels
       hide($('modelGate'));
       show($('modelContent'));
