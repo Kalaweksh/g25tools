@@ -509,7 +509,7 @@ import * as mixture from './model/mixture.js'
 
       const currentDir = headerRow.dataset.sortDir || 'none';
       const currentIndex = headerRow.dataset.sortIndex ? Number(headerRow.dataset.sortIndex) : null;
-      const nextDir = currentIndex === index && currentDir === 'asc' ? 'desc' : 'asc';
+      const nextDir = currentIndex === index && currentDir === 'desc' ? 'asc' : 'desc';
 
       sortableRows.sort((a, b) => {
         const aVal = getCellValue(a.cells[index]);
@@ -553,7 +553,7 @@ import * as mixture from './model/mixture.js'
         if (!row) return;
 
         const currentDir = row.dataset.sortDir || 'none';
-        const nextDir = currentDir === 'asc' ? 'desc' : 'asc';
+        const nextDir = currentDir === 'desc' ? 'asc' : 'desc';
         row.dataset.sortDir = nextDir;
         btn.setAttribute('aria-pressed', nextDir === 'asc' ? 'true' : 'false');
 
@@ -602,5 +602,4 @@ import * as mixture from './model/mixture.js'
 
 
 init();
-
 

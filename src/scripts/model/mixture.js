@@ -78,7 +78,6 @@ function createRunWrapper(config) {
 function renderSingleTable(result, options) {
   const {printZeroes, showImpCol} = options;
   const table = document.createElement('table');
-  table.dataset.rankColumn = '0';
   styleTableEl(table);
 
   const thead = document.createElement('thead');
@@ -91,8 +90,8 @@ function renderSingleTable(result, options) {
 
   const labelRow = document.createElement('tr');
   labelRow.innerHTML = showImpCol
-    ? `<th>Mix</th><th>Source</th><th class="number">Imp Δdist</th>`
-    : `<th>Mix</th><th>Source</th>`;
+    ? `<th>Source</th><th>Mix</th><th class="number">Imp Δdist</th>`
+    : `<th>Source</th><th>Mix</th>`;
   thead.appendChild(labelRow);
 
   table.appendChild(thead);
@@ -120,8 +119,8 @@ function renderSingleTable(result, options) {
     const tdName = document.createElement('td');
     tdName.textContent = p.name;
 
-    tr.appendChild(tdMix);
     tr.appendChild(tdName);
+    tr.appendChild(tdMix);
 
     if (showImpCol) {
     const tdImp = document.createElement('td');

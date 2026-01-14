@@ -94,8 +94,11 @@ for (const p of shown) {
     const tdDist = document.createElement('td');
     tdDist.className = 'number';
     tdDist.textContent = p.dist.toFixed(8);
-    const ratio = (p.dist - minDist) / span;
-    tdDist.style.backgroundImage = `linear-gradient(90deg, rgba(34,211,238,0.08), rgba(14,116,144,${0.15 + ratio * 0.45}))`;
+    const ratio = 1 - ((p.dist - minDist) / span);
+    const gradient = `linear-gradient(90deg, rgba(34,211,238,0.08), rgba(14,116,144,${0.15 + ratio * 0.45}))`;
+    tdName.style.backgroundImage = gradient;
+    tdRank.style.backgroundImage = gradient;
+    tdDist.style.backgroundImage = gradient;
     tr.appendChild(tdRank);
     tr.appendChild(tdName);
     tr.appendChild(tdDist);
