@@ -84,15 +84,15 @@ function renderSingleTable(result, options) {
   const thead = document.createElement('thead');
   const headRow = document.createElement('tr');
   const th = document.createElement('th');
-  th.colSpan = showImpCol ? 4 : 3;
+  th.colSpan = showImpCol ? 3 : 2;
   th.innerHTML = `Target: <strong>${escapeHTML(result.target)}</strong> • Distance: ${result.distance.toFixed(8)}`;
   headRow.appendChild(th);
   thead.appendChild(headRow);
 
   const labelRow = document.createElement('tr');
   labelRow.innerHTML = showImpCol
-    ? `<th class="number">%</th><th>Source</th><th>Bar</th><th class="number">Imp Δdist</th>`
-    : `<th class="number">%</th><th>Source</th><th>Bar</th>`;
+    ? `<th>Mix</th><th>Source</th><th class="number">Imp Δdist</th>`
+    : `<th>Mix</th><th>Source</th>`;
   thead.appendChild(labelRow);
 
   table.appendChild(thead);
@@ -102,26 +102,26 @@ function renderSingleTable(result, options) {
     if (!printZeroes && p.value === 0) continue;
 
     const tr = document.createElement('tr');
-    const tdVal = document.createElement('td');
-    tdVal.className = 'number';
-    tdVal.textContent = (p.value * 100).toFixed(1);
-    tdVal.dataset.sortValue = String(p.value);
+    const tdMix = document.createElement('td');
+    tdMix.className = 'mix-cell';
+    tdMix.dataset.sortValue = String(p.value);
+    const pct = document.createElement('span');
+    pct.className = 'mix-value';
+    pct.textContent = (p.value * 100).toFixed(1) + '%';
+    const outer = document.createElement('div');
+    outer.className = 'mix-bar';
+    const inner = document.createElement('div');
+    inner.className = 'mix-bar-fill';
+    inner.style.width = (clamp(p.value, 0, 1) * 100) + '%';
+    outer.appendChild(inner);
+    tdMix.appendChild(pct);
+    tdMix.appendChild(outer);
 
     const tdName = document.createElement('td');
     tdName.textContent = p.name;
 
-    const tdBar = document.createElement('td');
-    const outer = document.createElement('div');
-    outer.className = 'w-full h-3 rounded-full bg-zinc-800/80 overflow-hidden';
-    const inner = document.createElement('div');
-    inner.className = 'h-full bg-cyan-400';
-    inner.style.width = (clamp(p.value, 0, 1) * 100) + '%';
-    outer.appendChild(inner);
-    tdBar.appendChild(outer);
-
-    tr.appendChild(tdVal);
+    tr.appendChild(tdMix);
     tr.appendChild(tdName);
-    tr.appendChild(tdBar);
 
     if (showImpCol) {
     const tdImp = document.createElement('td');

@@ -71,7 +71,6 @@ pairs.sort((a, b) => a.dist - b.dist);
 
 const shown = pairs.slice(0, Math.min(topN, pairs.length));
 const table = document.createElement('table');
-table.dataset.rankColumn = '0';
 styleTableEl(table);
 const thead = document.createElement('thead');
 thead.innerHTML = `<tr><th colspan="3">Target: <strong>${escapeHTML(targetName)}</strong> • Showing ${shown.length}/${pairs.length}</th></tr>`;
@@ -81,6 +80,10 @@ thead.appendChild(labelRow);
 table.appendChild(thead);
 
 const tbody = document.createElement('tbody');
+const distValues = shown.map(p => p.dist);
+const minDist = Math.min(...distValues);
+const maxDist = Math.max(...distValues);
+const span = Math.max(1e-9, maxDist - minDist);
 for (const p of shown) {
     const tr = document.createElement('tr');
     const tdRank = document.createElement('td');
@@ -91,6 +94,8 @@ for (const p of shown) {
     const tdDist = document.createElement('td');
     tdDist.className = 'number';
     tdDist.textContent = p.dist.toFixed(8);
+    const ratio = (p.dist - minDist) / span;
+    tdDist.style.backgroundImage = `linear-gradient(90deg, rgba(34,211,238,0.08), rgba(14,116,144,${0.15 + ratio * 0.45}))`;
     tr.appendChild(tdRank);
     tr.appendChild(tdName);
     tr.appendChild(tdDist);

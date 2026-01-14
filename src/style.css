@@ -29,3 +29,8 @@ td.number, th.number { text-align: right; }
 .sort-indicator { color: rgba(113, 113, 122, 0.9); font-size: 0.75rem; }
 .row-sort-btn { margin-left: 0.4rem; font-size: 0.7rem; color: rgba(161, 161, 170, 0.9); border: 1px solid rgba(63, 63, 70, 0.6); border-radius: 999px; padding: 0.1rem 0.35rem; background: rgba(24, 24, 27, 0.6); }
 .row-sort-btn:hover { color: rgba(228, 228, 231, 0.95); border-color: rgba(34, 211, 238, 0.6); }
+
+.mix-cell { display: flex; align-items: center; gap: 0.5rem; }
+.mix-value { min-width: 3.25rem; text-align: right; font-variant-numeric: tabular-nums; color: rgba(228, 228, 231, 0.95); }
+.mix-bar { flex: 1; height: 0.35rem; border-radius: 999px; background: rgba(39, 39, 42, 0.8); overflow: hidden; }
+.mix-bar-fill { height: 100%; background: rgba(34, 211, 238, 0.9); }
