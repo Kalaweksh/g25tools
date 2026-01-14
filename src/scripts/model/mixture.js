@@ -1,7 +1,7 @@
   // ----------------------------
   // Mixture modelling (slots)
   // ----------------------------
-import {$, state, clamp, yieldToUI, aggregateByColon, styleTableEl, escapeHTML} from '../main.js'
+import {$, state, clamp, yieldToUI, aggregateByColon, styleTableEl, escapeHTML, makeTableSortable} from '../main.js'
 
 function fastMonteCarloSolver(targetVecScaled, sourceVecsScaled, slots, cyclesMult) {
   const nSources = sourceVecsScaled.length;
@@ -83,15 +83,15 @@ function renderSingleTable(result, options) {
   const thead = document.createElement('thead');
   const headRow = document.createElement('tr');
   const th = document.createElement('th');
-  th.colSpan = showImpCol ? 4 : 3;
+  th.colSpan = showImpCol ? 3 : 2;
   th.innerHTML = `Target: <strong>${escapeHTML(result.target)}</strong> • Distance: ${result.distance.toFixed(8)}`;
   headRow.appendChild(th);
   thead.appendChild(headRow);
 
   const labelRow = document.createElement('tr');
   labelRow.innerHTML = showImpCol
-    ? `<th class="number">%</th><th>Source</th><th>Bar</th><th class="number">Imp Δdist</th>`
-    : `<th class="number">%</th><th>Source</th><th>Bar</th>`;
+    ? `<th>Source</th><th>Mix</th><th class="number">Imp Δdist</th>`
+    : `<th>Source</th><th>Mix</th>`;
   thead.appendChild(labelRow);
 
   table.appendChild(thead);
@@ -101,42 +101,51 @@ function renderSingleTable(result, options) {
     if (!printZeroes && p.value === 0) continue;
 
     const tr = document.createElement('tr');
-    const tdVal = document.createElement('td');
-    tdVal.className = 'number';
-    tdVal.textContent = (p.value * 100).toFixed(1);
-
     const tdName = document.createElement('td');
     tdName.textContent = p.name;
 
-    const tdBar = document.createElement('td');
+    tr.appendChild(tdName);
+
+    const tdMix = document.createElement('td');
+    tdMix.className = 'mix-cell';
+    tdMix.dataset.sortValue = String(p.value);
+    const pct = document.createElement('span');
+    pct.className = 'mix-value';
+    pct.textContent = (p.value * 100).toFixed(1) + '%';
     const outer = document.createElement('div');
-    outer.className = 'w-full h-3 rounded-full bg-zinc-800/80 overflow-hidden';
+    outer.className = 'mix-bar';
     const inner = document.createElement('div');
-    inner.className = 'h-full bg-cyan-400';
+    inner.className = 'mix-bar-fill';
     inner.style.width = (clamp(p.value, 0, 1) * 100) + '%';
     outer.appendChild(inner);
-    tdBar.appendChild(outer);
-
-    tr.appendChild(tdVal);
-    tr.appendChild(tdName);
-    tr.appendChild(tdBar);
+    tdMix.appendChild(pct);
+    tdMix.appendChild(outer);
+    tr.appendChild(tdMix);
 
     if (showImpCol) {
-      const tdImp = document.createElement('td');
-      tdImp.className = 'number';
-      tdImp.textContent = (p.delta == null) ? '—' : p.delta.toFixed(8);
-      tr.appendChild(tdImp);
+    const tdImp = document.createElement('td');
+    tdImp.className = 'number';
+    if (p.delta == null) {
+      tdImp.textContent = '—';
+    } else {
+      tdImp.textContent = p.delta.toFixed(8);
+      tdImp.dataset.sortValue = String(p.delta);
+    }
+    tr.appendChild(tdImp);
     }
 
     tbody.appendChild(tr);
   }
 
   table.appendChild(tbody);
+  makeTableSortable(table);
   return table;
 }
 
 function renderMultiSummary({distances, matrix, colNames, colOrder, avg, avgDist}) {
   const table = document.createElement('table');
+  table.dataset.fixedColumns = '2';
+  table.dataset.rowSortable = 'true';
   styleTableEl(table);
 
   const thead = document.createElement('thead');
@@ -148,12 +157,29 @@ function renderMultiSummary({distances, matrix, colNames, colOrder, avg, avgDist
   const tbody = document.createElement('tbody');
   for (let t = 0; t < matrix.length; t++) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${escapeHTML(state.target.names[t])}</td><td class="number">${distances[t].toFixed(8)}</td>`;
+    const targetCell = document.createElement('td');
+    const targetName = document.createElement('span');
+    targetName.textContent = state.target.names[t];
+    const rowSortBtn = document.createElement('button');
+    rowSortBtn.type = 'button';
+    rowSortBtn.className = 'row-sort-btn';
+    rowSortBtn.setAttribute('aria-pressed', 'false');
+    rowSortBtn.setAttribute('title', 'Sort this row by values');
+    rowSortBtn.setAttribute('aria-label', 'Sort this row by values');
+    rowSortBtn.innerHTML = '<span aria-hidden="true">⇄</span>';
+    targetCell.appendChild(targetName);
+    targetCell.appendChild(rowSortBtn);
+    const distCell = document.createElement('td');
+    distCell.className = 'number';
+    distCell.textContent = distances[t].toFixed(8);
+    tr.appendChild(targetCell);
+    tr.appendChild(distCell);
     for (const i of colOrder) {
       const val = matrix[t][i];
       const td = document.createElement('td');
       td.className = 'number';
       td.textContent = (val * 100).toFixed(1);
+      td.dataset.sortValue = String(val);
       const pct = clamp(val, 0, 1);
       td.style.backgroundColor = `rgba(11,94,215,${0.06 + pct * 0.35})`;
       td.style.color = pct > 0.55 ? '#fff' : '';
@@ -163,12 +189,15 @@ function renderMultiSummary({distances, matrix, colNames, colOrder, avg, avgDist
   }
 
   const trAvg = document.createElement('tr');
+  trAvg.classList.add('is-summary');
+  trAvg.dataset.fixed = 'true';
   trAvg.innerHTML = `<td><strong>Average</strong></td><td class="number"><strong>${avgDist.toFixed(8)}</strong></td>`;
   for (const i of colOrder) {
     const val = avg[i];
     const td = document.createElement('td');
     td.className = 'number';
     td.textContent = (val * 100).toFixed(1);
+    td.dataset.sortValue = String(val);
     const pct = clamp(val, 0, 1);
     td.style.backgroundColor = `rgba(11,94,215,${0.06 + pct * 0.35})`;
     td.style.color = pct > 0.55 ? '#fff' : '';
@@ -181,6 +210,7 @@ function renderMultiSummary({distances, matrix, colNames, colOrder, avg, avgDist
   wrap.className = 'card';
   wrap.innerHTML = '<h3>Multi summary matrix</h3>';
   wrap.appendChild(table);
+  makeTableSortable(table, {fixedColumns: 2, rowSortable: true});
   return wrap;
 }
 
