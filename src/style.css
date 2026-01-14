@@ -1,0 +1,18 @@
+/* Tailwind-first UI.
+   Minimal CSS only for tab panel visibility + a few legacy JS-injected blocks. */
+
+.tab-panel, .subtab-panel { display: none; }
+.tab-panel.active, .subtab-panel.active { display: block; }
+
+/* Canvas crispness */
+canvas { image-rendering: auto; }
+
+/* Legacy JS-injected notices (kept for compatibility) */
+.notice { border-radius: 0.75rem; padding: 0.75rem; font-size: 0.875rem; border: 1px solid rgba(244, 63, 94, 0.35); background: rgba(244, 63, 94, 0.12); color: rgba(254, 226, 226, 0.95); }
+.notice-warn { border-color: rgba(251, 191, 36, 0.45); background: rgba(120, 53, 15, 0.25); color: rgba(254, 243, 199, 0.95); }
+
+/* Tables created in JS get styled via JS; this is a fallback */
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 0.5rem 0.625rem; border-bottom: 1px solid rgba(63, 63, 70, 0.6); }
+th { text-align: left; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(212, 212, 216, 0.85); }
+td.number, th.number { text-align: right; }
