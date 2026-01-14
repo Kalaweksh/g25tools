@@ -1,7 +1,7 @@
 // ----------------------------
 // Distance modelling
 // ----------------------------
-import {$, state, clamp, styleTableEl, escapeHTML} from '../main.js'
+import {$, state, clamp, styleTableEl, escapeHTML, makeTableSortable} from '../main.js'
 export function euclidean(a, b) {
 let s = 0;
 for (let i = 0; i < a.length; i++) {

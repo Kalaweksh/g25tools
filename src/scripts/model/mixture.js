@@ -1,7 +1,7 @@
   // ----------------------------
   // Mixture modelling (slots)
   // ----------------------------
-import {$, state, clamp, yieldToUI, aggregateByColon, styleTableEl, escapeHTML} from '../main.js'
+import {$, state, clamp, yieldToUI, aggregateByColon, styleTableEl, escapeHTML, makeTableSortable} from '../main.js'
 import {cosineSimilarity} from './distance.js'
 
 function fastMonteCarloSolver(targetVecScaled, sourceVecsScaled, slots, cyclesMult) {
