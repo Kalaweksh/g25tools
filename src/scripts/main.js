@@ -9,15 +9,12 @@
 
   Notes:
   - Mixture modelling uses a simplified slot-based Monte-Carlo local search inspired by Vahaduo.
-  - PCA uses covariance matrix + power iteration/deflation to extract top PCs (good for small d ~ 25).
-  - Clustering uses k-means on selected PCA axes.
+
 */
 import * as distance from './model/distance.js'
 import * as mixture from './model/mixture.js'
 
-import * as cluster from './analysis/cluster.js'
-import * as pca from './analysis/pca.js'
-import * as plot from './analysis/plot.js'
+
 
 
   // ----------------------------
@@ -28,17 +25,11 @@ import * as plot from './analysis/plot.js'
     dimensions: 0,
     source: null, // {rows, names, vectors}
     target: null, // {rows, names, vectors}
-    pca: null,    // {scores: n x m, pcs: d x m, evals: m, labels: n, kind: n}
     view: {
       tab: 'data',
       modelSubtab: 'distance',
-      analysisSubtab: 'pca',
-      // PCA view transform
-      panX: 0,
-      panY: 0,
-      zoom: 1,
+
     },
-    cluster: null, // {k, labels: n, include, axesKey}
   };
 
   // ----------------------------
@@ -50,7 +41,13 @@ import * as plot from './analysis/plot.js'
   export function setHTML(el, html) {
     el.innerHTML = html;
     // Apply Tailwind styling to any injected form controls / tables
-    try { styleFormControls(el); el.querySelectorAll('table').forEach(styleTableEl); } catch (e) {}
+    try {
+      styleFormControls(el);
+      el.querySelectorAll('table').forEach((table) => {
+        styleTableEl(table);
+        makeTableSortable(table);
+      });
+    } catch (e) {}
   }
 
   function show(el) { el.style.display = ''; }
@@ -196,12 +193,8 @@ import * as plot from './analysis/plot.js'
     qsa(group === 'model' ? '#tab-model .subtab-panel' : '#tab-analysis .subtab-panel').forEach(p => p.classList.remove('active'));
     $(panelPrefix + subName).classList.add('active');
 
-    // Ensure dendrogram never appears outside the clustering subtab
-    if (group === 'analysis' && subName !== 'cluster') {
-      drawDendrogram(null);
-    }
-  }
 
+  }
   
   // ----------------------------
   // Presets
@@ -245,16 +238,12 @@ import * as plot from './analysis/plot.js'
       state.source = rowsToData(sRows);
       state.target = rowsToData(tRows);
       state.loaded = true;
-      state.pca = null;
-      state.cluster = null;
       updateWorkspaceUI();
       distance.hydrateModelControls();
-      pca.hydrateAnalysisControls();
       // Gate panels
       hide($('modelGate'));
       show($('modelContent'));
-      hide($('analysisGate'));
-      show($('analysisContent'));
+
       // Update status badge
       const badge = $('dataStatus');
       badge.classList.remove('badge-warn');
@@ -275,15 +264,12 @@ import * as plot from './analysis/plot.js'
     state.dimensions = 0;
     state.source = null;
     state.target = null;
-    state.pca = null;
-    state.cluster = null;
     updateWorkspaceUI();
 
     // Gate panels
     show($('modelGate'));
     hide($('modelContent'));
-    show($('analysisGate'));
-    hide($('analysisContent'));
+
 
     // Badge
     const badge = $('dataStatus');
@@ -295,7 +281,6 @@ import * as plot from './analysis/plot.js'
     // Clear outputs
     setHTML($('distanceOutput'), '');
     setHTML($('mixtureOutput'), '');
-    setHTML($('clusterOutput'), '');
     clearCanvas();
   }
 
@@ -380,33 +365,13 @@ import * as plot from './analysis/plot.js'
     $('runMulti').addEventListener('click', () => mixture.runMixture(false));
     $('clearMixture').addEventListener('click', () => setHTML($('mixtureOutput'), ''));
 
-    // Analysis: PCA
-    // $('computePCA').addEventListener('click', computePCA);
-    // $('resetView').addEventListener('click', resetView);
-    // $('pcaX').addEventListener('change', () => { if (state.cluster) state.cluster = null; drawDendrogram(null);
-    //   renderPCA(); renderClusterSummary(); });
-    // $('pcaY').addEventListener('change', () => { if (state.cluster) state.cluster = null; renderPCA(); renderClusterSummary(); });
-    // $('pcaShow').addEventListener('change', renderPCA);
-    // $('pcaColour').addEventListener('change', renderPCA);
 
-    // // Analysis: clustering
-    // $('runKMeans').addEventListener('click', runKMeans);
-    // $('clearClusters').addEventListener('click', clearClusters);
-
-    // initCanvasInteractions();
 
     // Initial gates
     updateWorkspaceUI();
     show($('modelGate'));
     hide($('modelContent'));
-    show($('analysisGate'));
-    hide($('analysisContent'));
 
-    // Analysis: dendrogram options
-    // const dl = $('dendroLabels');
-    // if (dl) dl.addEventListener('change', () => {
-    //   if (state.cluster && state.cluster.algorithm === 'hier_ward' && state.cluster.hier) drawDendrogram(state.cluster.hier);
-    // });
 
 
     // Mixture preset
@@ -464,7 +429,7 @@ import * as plot from './analysis/plot.js'
   if (!table) return;
 
   const apply = () => {
-    table.classList.add('w-full', 'text-sm', 'overflow-hidden', 'rounded-2xl', 'border', 'border-zinc-800');
+    table.classList.add('w-full', 'text-sm', 'overflow-hidden', 'rounded-2xl', 'border', 'border-zinc-800', 'table-compact');
     table.querySelectorAll('thead th').forEach(th => {
       th.classList.add('bg-zinc-950', 'text-zinc-300', 'uppercase', 'tracking-wider', 'text-xs', 'font-semibold');
     });
@@ -481,6 +446,159 @@ import * as plot from './analysis/plot.js'
   // …and again after the current call stack, to catch cells appended later.
   queueMicrotask(apply);
 }
+
+  function getSortableHeaderRow(table) {
+    const head = table?.tHead;
+    if (!head) return null;
+    const rows = Array.from(head.rows);
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const row = rows[i];
+      const cells = Array.from(row.cells);
+      if (cells.length <= 1) continue;
+      if (cells.some(cell => cell.colSpan > 1)) continue;
+      return row;
+    }
+    return null;
+  }
+
+  function getCellValue(cell) {
+    if (!cell) return '';
+    if (cell.dataset.sortValue != null) return cell.dataset.sortValue;
+    return cell.textContent.trim();
+  }
+
+  function detectNumeric(values) {
+    return values.every(val => val !== '' && !Number.isNaN(Number.parseFloat(val)));
+  }
+
+  export function makeTableSortable(table, options = {}) {
+    if (!table || table.dataset.sortableInitialized) return;
+
+    const fixedColumns = options.fixedColumns ?? Number(table.dataset.fixedColumns ?? 0);
+    const rowSortable = options.rowSortable ?? table.dataset.rowSortable === 'true';
+    const rankColumn = options.rankColumn ?? (table.dataset.rankColumn ? Number(table.dataset.rankColumn) : null);
+
+    const headerRow = getSortableHeaderRow(table);
+    if (!headerRow) return;
+
+    const headers = Array.from(headerRow.cells);
+    headers.forEach((th, index) => {
+      const label = th.textContent.trim();
+      if (!label) return;
+      th.classList.add('sortable');
+      th.setAttribute('aria-sort', 'none');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sort-btn';
+      btn.innerHTML = `<span>${escapeHTML(label)}</span><span class="sort-indicator" aria-hidden="true">↕</span>`;
+      th.textContent = '';
+      th.appendChild(btn);
+      btn.addEventListener('click', () => sortByColumn(index));
+    });
+
+    const tbody = table.tBodies[0];
+    if (!tbody) return;
+
+    const sortByColumn = (index) => {
+      const rows = Array.from(tbody.rows);
+      const fixedRows = rows.filter(row => row.dataset.fixed === 'true' || row.classList.contains('is-summary'));
+      const sortableRows = rows.filter(row => !fixedRows.includes(row));
+
+      const values = sortableRows.map(row => getCellValue(row.cells[index]));
+      const isNumeric = detectNumeric(values);
+
+      const currentDir = headerRow.dataset.sortDir || 'none';
+      const currentIndex = headerRow.dataset.sortIndex ? Number(headerRow.dataset.sortIndex) : null;
+      const nextDir = currentIndex === index && currentDir === 'desc' ? 'asc' : 'desc';
+
+      sortableRows.sort((a, b) => {
+        const aVal = getCellValue(a.cells[index]);
+        const bVal = getCellValue(b.cells[index]);
+        if (isNumeric) {
+          const diff = Number.parseFloat(aVal) - Number.parseFloat(bVal);
+          return nextDir === 'asc' ? diff : -diff;
+        }
+        return nextDir === 'asc'
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      });
+
+      sortableRows.forEach(row => tbody.appendChild(row));
+      fixedRows.forEach(row => tbody.appendChild(row));
+
+      if (rankColumn != null) {
+        const updatedRows = Array.from(tbody.rows).filter(row => !row.classList.contains('is-summary'));
+        updatedRows.forEach((row, idx) => {
+          const cell = row.cells[rankColumn];
+          if (cell) cell.textContent = String(idx + 1);
+        });
+      }
+
+      headers.forEach((th, idx) => {
+        const dir = idx === index ? nextDir : 'none';
+        th.setAttribute('aria-sort', dir === 'none' ? 'none' : dir === 'asc' ? 'ascending' : 'descending');
+        const indicator = th.querySelector('.sort-indicator');
+        if (indicator) indicator.textContent = dir === 'none' ? '↕' : dir === 'asc' ? '↑' : '↓';
+      });
+
+      headerRow.dataset.sortIndex = String(index);
+      headerRow.dataset.sortDir = nextDir;
+    };
+
+    if (rowSortable) {
+      tbody.addEventListener('click', (event) => {
+        const btn = event.target.closest('.row-sort-btn');
+        if (!btn) return;
+        const row = btn.closest('tr');
+        if (!row) return;
+
+        const currentDir = row.dataset.sortDir || 'none';
+        const nextDir = currentDir === 'desc' ? 'asc' : 'desc';
+        row.dataset.sortDir = nextDir;
+        btn.setAttribute('aria-pressed', nextDir === 'asc' ? 'true' : 'false');
+
+        const baseCells = Array.from(row.cells).slice(fixedColumns);
+        const values = baseCells.map(cell => getCellValue(cell));
+        const isNumeric = detectNumeric(values);
+
+        const order = baseCells.map((cell, idx) => ({
+          idx: idx + fixedColumns,
+          value: getCellValue(cell)
+        }));
+
+        order.sort((a, b) => {
+          if (isNumeric) {
+            const diff = Number.parseFloat(a.value) - Number.parseFloat(b.value);
+            return nextDir === 'asc' ? diff : -diff;
+          }
+          return nextDir === 'asc'
+            ? String(a.value).localeCompare(String(b.value))
+            : String(b.value).localeCompare(String(a.value));
+        });
+
+        const rowsToUpdate = [
+          ...(table.tHead ? Array.from(table.tHead.rows) : []),
+          ...Array.from(tbody.rows)
+        ];
+
+        rowsToUpdate.forEach((rowEl) => {
+          const cells = Array.from(rowEl.cells);
+          if (cells.length <= fixedColumns) return;
+          const fixed = cells.slice(0, fixedColumns);
+          const sorted = order.map(item => cells[item.idx]);
+          rowEl.replaceChildren(...fixed, ...sorted);
+        });
+
+        headers.forEach((th) => {
+          th.setAttribute('aria-sort', 'none');
+          const indicator = th.querySelector('.sort-indicator');
+          if (indicator) indicator.textContent = '↕';
+        });
+      });
+    }
+
+    table.dataset.sortableInitialized = 'true';
+  }
 
 
 init();
