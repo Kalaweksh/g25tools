@@ -1,7 +1,8 @@
   // ----------------------------
   // Mixture modelling (slots)
   // ----------------------------
-import {$, state, clamp, yieldToUI, aggregateByColon, styleTableEl, escapeHTML, makeTableSortable} from '../main.js'
+import {$, state, clamp, yieldToUI, aggregateByColon, styleTableEl, escapeHTML} from '../main.js'
+import {cosineSimilarity} from './distance.js'
 
 function fastMonteCarloSolver(targetVecScaled, sourceVecsScaled, slots, cyclesMult) {
   const nSources = sourceVecsScaled.length;
@@ -58,6 +59,7 @@ function getMixtureConfig() {
     cycles: clamp(Number.parseInt(cyclesRaw, 10), 100, 100000),
     printZeroes: $('printZeroes')?.value === 'yes',
     doAgg: $('aggregate')?.value === 'yes',
+    residualTopN: clamp(Number.parseInt($('mixResidualTopN')?.value ?? '25', 10), 1, 100000),
     doImportance: $('mixImportance')?.checked ?? false,
     impPerms: clamp(Number.parseInt($('mixImpPerms')?.value ?? '3', 10), 1, 100000),
     usedOnly: ($('mixImpUsedOnly')?.value ?? 'yes') === 'yes',
@@ -139,6 +141,69 @@ function renderSingleTable(result, options) {
 
   table.appendChild(tbody);
   makeTableSortable(table);
+  return table;
+}
+
+function computeResidualVector(targetVec, sourceVecs, weights) {
+  const dim = targetVec.length;
+  const residual = new Array(dim).fill(0);
+  for (let j = 0; j < dim; j++) residual[j] = targetVec[j];
+  for (let i = 0; i < sourceVecs.length; i++) {
+    const w = weights[i] || 0;
+    if (w === 0) continue;
+    const src = sourceVecs[i];
+    for (let j = 0; j < dim; j++) residual[j] -= w * src[j];
+  }
+  return residual;
+}
+
+function computeResidualSimilarities(residual, names, vectors, doAgg) {
+  let simNames = names.slice();
+  let sims = vectors.map(vec => cosineSimilarity(residual, vec));
+
+  if (doAgg) {
+    const map = new Map();
+    for (let i = 0; i < simNames.length; i++) {
+      const key = simNames[i].split(':')[0];
+      const prev = map.get(key);
+      const val = sims[i];
+      map.set(key, prev == null ? val : Math.max(prev, val));
+    }
+    simNames = Array.from(map.keys());
+    sims = simNames.map(n => map.get(n));
+  }
+
+  const pairs = simNames.map((name, i) => ({ name, sim: sims[i] }));
+  pairs.sort((a, b) => b.sim - a.sim);
+  return pairs;
+}
+
+function renderResidualSimilarityTable({targetName, pairs, shownCount, totalCount}) {
+  const table = document.createElement('table');
+  styleTableEl(table);
+
+  const thead = document.createElement('thead');
+  thead.innerHTML = `<tr><th colspan="3">Residual cosine similarity • Target: <strong>${escapeHTML(targetName)}</strong> • Showing ${shownCount}/${totalCount}</th></tr>`;
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  pairs.slice(0, shownCount).forEach((p, idx) => {
+    const tr = document.createElement('tr');
+    const tdRank = document.createElement('td');
+    tdRank.className = 'number';
+    tdRank.textContent = String(idx + 1);
+    const tdName = document.createElement('td');
+    tdName.textContent = p.name;
+    const tdSim = document.createElement('td');
+    tdSim.className = 'number';
+    tdSim.textContent = p.sim.toFixed(8);
+    tr.appendChild(tdRank);
+    tr.appendChild(tdName);
+    tr.appendChild(tdSim);
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
   return table;
 }
 
@@ -347,6 +412,25 @@ export async function runMixture(single) {
   for (const result of resultSet.results) {
     if (single) {
       runWrap.appendChild(renderSingleTable(result, {printZeroes: config.printZeroes, showImpCol: result.showImpCol}));
+      const tIdx = config.singleIdx;
+      const residual = computeResidualVector(
+        state.target.vectors[tIdx],
+        state.source.vectors,
+        resultSet.weightsByTarget[0]
+      );
+      const residualPairs = computeResidualSimilarities(
+        residual,
+        state.source.names,
+        state.source.vectors,
+        config.doAgg
+      );
+      const shownCount = Math.min(config.residualTopN, residualPairs.length);
+      runWrap.appendChild(renderResidualSimilarityTable({
+        targetName: result.target,
+        pairs: residualPairs,
+        shownCount,
+        totalCount: residualPairs.length
+      }));
     }
   }
 

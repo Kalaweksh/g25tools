@@ -1,7 +1,7 @@
 // ----------------------------
 // Distance modelling
 // ----------------------------
-import {$, state, clamp, styleTableEl, escapeHTML, makeTableSortable} from '../main.js'
+import {$, state, clamp, styleTableEl, escapeHTML} from '../main.js'
 export function euclidean(a, b) {
 let s = 0;
 for (let i = 0; i < a.length; i++) {
@@ -9,6 +9,19 @@ for (let i = 0; i < a.length; i++) {
     s += d * d;
 }
 return Math.sqrt(s);
+}
+
+export function cosineSimilarity(a, b) {
+let dot = 0;
+let normA = 0;
+let normB = 0;
+for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+}
+if (normA === 0 || normB === 0) return 0;
+return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
 export function hydrateModelControls() {
