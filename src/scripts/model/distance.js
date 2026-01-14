@@ -1,7 +1,7 @@
 // ----------------------------
 // Distance modelling
 // ----------------------------
-import {$, state, clamp, styleTableEl, escapeHTML} from '../main.js'
+import {$, state, clamp, styleTableEl, escapeHTML, makeTableSortable} from '../main.js'
 export function euclidean(a, b) {
 let s = 0;
 for (let i = 0; i < a.length; i++) {
@@ -74,9 +74,16 @@ const table = document.createElement('table');
 styleTableEl(table);
 const thead = document.createElement('thead');
 thead.innerHTML = `<tr><th colspan="3">Target: <strong>${escapeHTML(targetName)}</strong> • Showing ${shown.length}/${pairs.length}</th></tr>`;
+const labelRow = document.createElement('tr');
+labelRow.innerHTML = '<th class="number">Rank</th><th>Source</th><th class="number">Distance</th>';
+thead.appendChild(labelRow);
 table.appendChild(thead);
 
 const tbody = document.createElement('tbody');
+const distValues = shown.map(p => p.dist);
+const minDist = Math.min(...distValues);
+const maxDist = Math.max(...distValues);
+const span = Math.max(1e-9, maxDist - minDist);
 for (const p of shown) {
     const tr = document.createElement('tr');
     const tdRank = document.createElement('td');
@@ -87,12 +94,20 @@ for (const p of shown) {
     const tdDist = document.createElement('td');
     tdDist.className = 'number';
     tdDist.textContent = p.dist.toFixed(8);
+    const ratio = (p.dist - minDist) / span;
+    const baseAlpha = 0.08 + ratio * 0.2;
+    const strongAlpha = 0.15 + ratio * 0.45;
+    const gradientBase = `linear-gradient(90deg, rgba(34,211,238,${baseAlpha}), rgba(14,116,144,${baseAlpha}))`;
+    tdRank.style.backgroundImage = gradientBase;
+    tdName.style.backgroundImage = gradientBase;
+    tdDist.style.backgroundImage = `linear-gradient(90deg, rgba(34,211,238,0.08), rgba(14,116,144,${strongAlpha}))`;
     tr.appendChild(tdRank);
     tr.appendChild(tdName);
     tr.appendChild(tdDist);
     tbody.appendChild(tr);
 }
 table.appendChild(tbody);
+makeTableSortable(table);
 const out = $('distanceOutput');
 // Accumulate outputs; Clear button removes all previous runs.
 const wrap = document.createElement('div');
