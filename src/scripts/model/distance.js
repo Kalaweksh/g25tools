@@ -71,11 +71,12 @@ pairs.sort((a, b) => a.dist - b.dist);
 
 const shown = pairs.slice(0, Math.min(topN, pairs.length));
 const table = document.createElement('table');
+table.dataset.rankColumn = '1';
 styleTableEl(table);
 const thead = document.createElement('thead');
 thead.innerHTML = `<tr><th colspan="3">Target: <strong>${escapeHTML(targetName)}</strong> • Showing ${shown.length}/${pairs.length}</th></tr>`;
 const labelRow = document.createElement('tr');
-labelRow.innerHTML = '<th class="number">Rank</th><th>Source</th><th class="number">Distance</th>';
+labelRow.innerHTML = '<th>Source</th><th class="number">Rank</th><th class="number">Distance</th>';
 thead.appendChild(labelRow);
 table.appendChild(thead);
 
@@ -86,18 +87,21 @@ const maxDist = Math.max(...distValues);
 const span = Math.max(1e-9, maxDist - minDist);
 for (const p of shown) {
     const tr = document.createElement('tr');
+    const tdName = document.createElement('td');
+    tdName.textContent = p.name;
     const tdRank = document.createElement('td');
     tdRank.className = 'number';
     tdRank.textContent = String(shown.indexOf(p) + 1);
-    const tdName = document.createElement('td');
-    tdName.textContent = p.name;
     const tdDist = document.createElement('td');
     tdDist.className = 'number';
     tdDist.textContent = p.dist.toFixed(8);
     const ratio = (p.dist - minDist) / span;
-    tdDist.style.backgroundImage = `linear-gradient(90deg, rgba(34,211,238,0.08), rgba(14,116,144,${0.15 + ratio * 0.45}))`;
-    tr.appendChild(tdRank);
+    const gradient = `linear-gradient(90deg, rgba(34,211,238,0.08), rgba(14,116,144,${0.15 + ratio * 0.45}))`;
+    tdName.style.backgroundImage = gradient;
+    tdRank.style.backgroundImage = gradient;
+    tdDist.style.backgroundImage = gradient;
     tr.appendChild(tdName);
+    tr.appendChild(tdRank);
     tr.appendChild(tdDist);
     tbody.appendChild(tr);
 }

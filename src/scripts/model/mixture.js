@@ -78,7 +78,6 @@ function createRunWrapper(config) {
 function renderSingleTable(result, options) {
   const {printZeroes, showImpCol} = options;
   const table = document.createElement('table');
-  table.dataset.rankColumn = '0';
   styleTableEl(table);
 
   const thead = document.createElement('thead');
