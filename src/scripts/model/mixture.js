@@ -314,11 +314,21 @@ async function computeMixtureResults(single, config, jobId, onImportance) {
 
     if (config.doImportance && single) {
       if (jobId !== state._mixJobId) return null;
-      const usedMask = config.usedOnly ? res.weights.map(w => w > 1e-6) : null;
+      const usedMask = res.weights.map(w => w > 1e-6);
+      const computeMask = config.usedOnly ? usedMask : null;
       if (onImportance) onImportance(`Computing permutation importance… perms=${config.impPerms} ${config.usedOnly ? '(used sources only)' : '(all sources)'}`);
       await yieldToUI();
 
-      const pi = await computePermutationImportance(tVecScaled, sVecsScaled, config.slots, config.cycles, res.distance, config.impPerms, usedMask);
+      const pi = await computePermutationImportance(
+        tVecScaled,
+        sVecsScaled,
+        config.slots,
+        config.cycles,
+        res.distance,
+        config.impPerms,
+        usedMask,
+        computeMask
+      );
       if (jobId !== state._mixJobId) return null;
 
       deltaVals = new Array(sNamesRaw.length).fill(0);
@@ -487,19 +497,47 @@ function permuteVector(v, rand) {
   return a;
 }
 
-async function computePermutationImportance(tVecScaled, sVecsScaled, slots, cycles, baseDist, perms, usedOnlyMask) {
+async function computePermutationImportance(tVecScaled, sVecsScaled, slots, cycles, baseDist, perms, allowedMask, computeMask) {
   const nS = sVecsScaled.length;
   const imp = new Array(nS).fill(0);
   const cnt = new Array(nS).fill(0);
+  const allowedIndices = [];
+  const allowedIndexBySource = new Array(nS).fill(-1);
+  if (allowedMask) {
+    for (let i = 0; i < nS; i++) {
+      if (!allowedMask[i]) continue;
+      allowedIndexBySource[i] = allowedIndices.length;
+      allowedIndices.push(i);
+    }
+    if (allowedIndices.length === 0) {
+      for (let i = 0; i < nS; i++) {
+        allowedIndexBySource[i] = i;
+        allowedIndices.push(i);
+      }
+    }
+  } else {
+    for (let i = 0; i < nS; i++) {
+      allowedIndexBySource[i] = i;
+      allowedIndices.push(i);
+    }
+  }
+
+  const allowedVecs = allowedIndices.map(i => sVecsScaled[i]);
 
   for (let i = 0; i < nS; i++) {
-    if (usedOnlyMask && !usedOnlyMask[i]) continue;
+    if (computeMask && !computeMask[i]) continue;
+    if (allowedMask && !allowedMask[i]) {
+      imp[i] = 0;
+      cnt[i] = perms;
+      continue;
+    }
 
     const rand = lcg(123456789 + i * 97);
     let sum = 0;
     for (let p = 0; p < perms; p++) {
-      const sv = sVecsScaled.slice();
-      sv[i] = permuteVector(sVecsScaled[i], rand);
+      const sv = allowedVecs.slice();
+      const slotIdx = allowedIndexBySource[i];
+      sv[slotIdx] = permuteVector(sVecsScaled[i], rand);
 
       const r = fastMonteCarloSolver(tVecScaled, sv, slots, cycles);
       sum += (r.distance - baseDist);
