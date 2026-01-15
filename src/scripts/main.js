@@ -36,7 +36,7 @@ import * as gmm from './model/gmm.js'
       panY: 0,
       zoom: 1,
     },
-    cluster: null, // {algorithm, k, labels, softLabels, means, covariances, weights, bic, aic}
+    cluster: null, // {algorithm, k, labels, softLabels, means, covariances, weights, bic, aic, bayesian, priors}
   };
 
   // ----------------------------

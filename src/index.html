@@ -438,6 +438,35 @@ Ind2,0.055,0.16,0.10"></textarea>
 </label>
 </div>
 </details>
+<details class="mt-3 rounded-xl border border-zinc-800 bg-zinc-950/40 p-3">
+<summary class="cursor-pointer select-none font-semibold text-zinc-100 flex items-center justify-between gap-3 flex-wrap">
+  <span>Bayesian priors</span>
+  <span class="relative inline-flex items-center group">
+    <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950/60 text-[11px] font-bold text-zinc-200 hover:bg-zinc-900/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60" aria-describedby="tt-gmm-bayes" aria-label="Bayesian priors help">?</button>
+    <span id="tt-gmm-bayes" role="tooltip" class="pointer-events-none absolute right-0 top-full z-50 mt-2 w-[28rem] rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs text-zinc-200 shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+      Dirichlet prior on weights, Normal prior on means, and variance/covariance priors regularize EM updates for a Bayesian GMM.
+    </span>
+  </span>
+</summary>
+<div class="mt-3 grid grid-cols-1 gap-3">
+<label class="flex flex-col gap-1">
+  <span class="text-xs text-zinc-300 whitespace-normal break-words">Weight prior (α)</span>
+  <input class="w-full min-w-[8ch] font-mono tabular-nums" id="gmmWeightPrior" min="0.000001" step="0.1" type="number" value="1.1"/>
+</label>
+<label class="flex flex-col gap-1">
+  <span class="text-xs text-zinc-300 whitespace-normal break-words">Mean prior strength (κ)</span>
+  <input class="w-full min-w-[8ch] font-mono tabular-nums" id="gmmMeanPrior" min="0.000001" step="0.01" type="number" value="0.01"/>
+</label>
+<label class="flex flex-col gap-1">
+  <span class="text-xs text-zinc-300 whitespace-normal break-words">Covariance prior scale</span>
+  <input class="w-full min-w-[8ch] font-mono tabular-nums" id="gmmCovPriorScale" min="0.000001" step="0.1" type="number" value="1"/>
+</label>
+<label class="flex flex-col gap-1">
+  <span class="text-xs text-zinc-300 whitespace-normal break-words">Covariance prior dof</span>
+  <input class="w-full min-w-[8ch] font-mono tabular-nums" id="gmmCovPriorDf" min="0" step="1" type="number" value="2"/>
+</label>
+</div>
+</details>
 </div>
 </div><div class="rounded-2xl border border-zinc-800 bg-zinc-950/50 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] lg:col-span-8 flex flex-col min-h-[520px]">
 <h3>GMM Output</h3>

@@ -12,6 +12,10 @@ const DEFAULTS = {
   criterion: 'none',
   minK: 2,
   maxK: 8,
+  weightPrior: 1.1,
+  meanPriorStrength: 0.01,
+  covPriorScale: 1,
+  covPriorDf: 2,
 };
 
 function randChoice(arr) {
@@ -213,7 +217,7 @@ function expectation(points, weights, means, covariances, covarianceType, cached
   return {responsibilities, logLikelihood};
 }
 
-function maximization(points, responsibilities, covarianceType, varianceFloor) {
+function maximization(points, responsibilities, covarianceType, varianceFloor, priors) {
   const n = points.length;
   const d = points[0].length;
   const k = responsibilities[0].length;
@@ -224,62 +228,96 @@ function maximization(points, responsibilities, covarianceType, varianceFloor) {
   }
 
   const means = Array.from({length: k}, () => new Array(d).fill(0));
+  const xbars = Array.from({length: k}, () => new Array(d).fill(0));
   for (let i = 0; i < n; i++) {
     const x = points[i];
     for (let c = 0; c < k; c++) {
       const r = responsibilities[i][c];
       if (r === 0) continue;
-      for (let j = 0; j < d; j++) means[c][j] += r * x[j];
+      for (let j = 0; j < d; j++) xbars[c][j] += r * x[j];
     }
   }
   for (let c = 0; c < k; c++) {
     const denom = nk[c] || 1;
-    for (let j = 0; j < d; j++) means[c][j] /= denom;
+    for (let j = 0; j < d; j++) xbars[c][j] /= denom;
   }
 
   let covariances = null;
+  const kappa0 = priors.meanPriorStrength;
+  const mu0 = priors.meanPrior;
+  const alphaWeight = priors.weightPrior;
   if (covarianceType === 'full') {
     covariances = Array.from({length: k}, () => Array.from({length: d}, () => new Array(d).fill(0)));
+    const scatter = Array.from({length: k}, () => Array.from({length: d}, () => new Array(d).fill(0)));
     for (let i = 0; i < n; i++) {
       const x = points[i];
       for (let c = 0; c < k; c++) {
         const r = responsibilities[i][c];
         if (r === 0) continue;
         for (let rIdx = 0; rIdx < d; rIdx++) {
-          const diffR = x[rIdx] - means[c][rIdx];
+          const diffR = x[rIdx] - xbars[c][rIdx];
           for (let cIdx = 0; cIdx < d; cIdx++) {
-            covariances[c][rIdx][cIdx] += r * diffR * (x[cIdx] - means[c][cIdx]);
+            scatter[c][rIdx][cIdx] += r * diffR * (x[cIdx] - xbars[c][cIdx]);
           }
         }
       }
     }
     for (let c = 0; c < k; c++) {
-      const denom = nk[c] || 1;
+      const denom = nk[c] || 0;
+      const kappaN = kappa0 + denom;
+      for (let j = 0; j < d; j++) {
+        means[c][j] = (kappa0 * mu0[j] + denom * xbars[c][j]) / Math.max(1e-12, kappaN);
+      }
+      const diff = new Array(d);
+      for (let j = 0; j < d; j++) diff[j] = xbars[c][j] - mu0[j];
+      const scale = (kappa0 * denom) / Math.max(1e-12, kappaN);
+      const psi = Array.from({length: d}, (_, rIdx) => {
+        const row = new Array(d).fill(0);
+        for (let cIdx = 0; cIdx < d; cIdx++) {
+          row[cIdx] = priors.covPrior[rIdx][cIdx] + scatter[c][rIdx][cIdx] + scale * diff[rIdx] * diff[cIdx];
+        }
+        return row;
+      });
+      const nuN = priors.covPriorNu + denom;
+      const denomCov = Math.max(1e-12, nuN + d + 1);
       for (let rIdx = 0; rIdx < d; rIdx++) {
-        for (let cIdx = 0; cIdx < d; cIdx++) covariances[c][rIdx][cIdx] /= denom;
+        for (let cIdx = 0; cIdx < d; cIdx++) covariances[c][rIdx][cIdx] = psi[rIdx][cIdx] / denomCov;
         covariances[c][rIdx][rIdx] = Math.max(covariances[c][rIdx][rIdx], varianceFloor);
       }
     }
   } else {
     covariances = Array.from({length: k}, () => new Array(d).fill(varianceFloor));
+    const scatter = Array.from({length: k}, () => new Array(d).fill(0));
     for (let i = 0; i < n; i++) {
       const x = points[i];
       for (let c = 0; c < k; c++) {
         const r = responsibilities[i][c];
         if (r === 0) continue;
         for (let j = 0; j < d; j++) {
-          const diff = x[j] - means[c][j];
-          covariances[c][j] += r * diff * diff;
+          const diff = x[j] - xbars[c][j];
+          scatter[c][j] += r * diff * diff;
         }
       }
     }
     for (let c = 0; c < k; c++) {
-      const denom = nk[c] || 1;
-      for (let j = 0; j < d; j++) covariances[c][j] = Math.max(covariances[c][j] / denom, varianceFloor);
+      const denom = nk[c] || 0;
+      const kappaN = kappa0 + denom;
+      for (let j = 0; j < d; j++) {
+        means[c][j] = (kappa0 * mu0[j] + denom * xbars[c][j]) / Math.max(1e-12, kappaN);
+      }
+      for (let j = 0; j < d; j++) {
+        const diff = xbars[c][j] - mu0[j];
+        const alphaN = priors.varPriorAlpha + denom / 2;
+        const betaN = priors.varPriorBeta[j]
+          + 0.5 * scatter[c][j]
+          + (kappa0 * denom / Math.max(1e-12, kappaN)) * (diff * diff) / 2;
+        const mode = betaN / Math.max(1e-12, alphaN + 1);
+        covariances[c][j] = Math.max(mode, varianceFloor);
+      }
     }
   }
 
-  const weights = nk.map(val => Math.max(val / n, 1e-12));
+  const weights = nk.map(val => Math.max((val + alphaWeight) / (n + k * alphaWeight), 1e-12));
   return {means, covariances, weights};
 }
 
@@ -303,11 +341,25 @@ export function runGMM(points, options = {}) {
   let means = kmeansPlusPlusInit(points, k);
   const overallMean = meanVector(points);
   let covariances = null;
+  const baseVar = varianceVector(points, overallMean, opts.varianceFloor);
+  const priorVar = baseVar.map(v => Math.max(v * opts.covPriorScale, opts.varianceFloor));
+  const varPriorAlpha = Math.max(2, opts.covPriorDf + 2);
+  const varPriorBeta = priorVar.map(v => v * (varPriorAlpha + 1));
+  const baseCov = covarianceMatrix(points, overallMean, opts.varianceFloor);
+  const priorNu = Math.max(d + 2, d + opts.covPriorDf + 2);
+  const covPrior = baseCov.map(row => row.map(v => v * opts.covPriorScale * (priorNu + d + 1)));
+  const priors = {
+    weightPrior: Math.max(1e-6, opts.weightPrior),
+    meanPriorStrength: Math.max(1e-6, opts.meanPriorStrength),
+    meanPrior: overallMean,
+    varPriorAlpha,
+    varPriorBeta,
+    covPrior,
+    covPriorNu: priorNu,
+  };
   if (opts.covarianceType === 'full') {
-    const baseCov = covarianceMatrix(points, overallMean, opts.varianceFloor);
     covariances = Array.from({length: k}, () => deepCopyMatrix(baseCov));
   } else {
-    const baseVar = varianceVector(points, overallMean, opts.varianceFloor);
     covariances = Array.from({length: k}, () => baseVar.slice());
   }
   let weights = new Array(k).fill(1 / k);
@@ -325,7 +377,7 @@ export function runGMM(points, options = {}) {
     const eStep = expectation(points, weights, means, covariances, opts.covarianceType, cachedInverses || []);
     responsibilities = eStep.responsibilities;
 
-    const mStep = maximization(points, responsibilities, opts.covarianceType, opts.varianceFloor);
+    const mStep = maximization(points, responsibilities, opts.covarianceType, opts.varianceFloor, priors);
     means = mStep.means;
     covariances = mStep.covariances;
     weights = mStep.weights;
@@ -366,6 +418,13 @@ export function runGMM(points, options = {}) {
     converged,
     k,
     covarianceType: opts.covarianceType,
+    bayesian: true,
+    priors: {
+      weightPrior: priors.weightPrior,
+      meanPriorStrength: priors.meanPriorStrength,
+      covPriorScale: opts.covPriorScale,
+      covPriorDf: opts.covPriorDf,
+    },
   };
 }
 
@@ -378,26 +437,27 @@ function getGmmConfig() {
     maxIter: clamp(Number.parseInt($('gmmMaxIter')?.value ?? DEFAULTS.maxIter, 10), 5, 100000),
     tol: clamp(Number.parseFloat($('gmmTol')?.value ?? DEFAULTS.tol), 1e-8, 1),
     criterion: $('gmmCriterion')?.value ?? 'none',
+    weightPrior: clamp(Number.parseFloat($('gmmWeightPrior')?.value ?? DEFAULTS.weightPrior), 1e-6, 1e6),
+    meanPriorStrength: clamp(Number.parseFloat($('gmmMeanPrior')?.value ?? DEFAULTS.meanPriorStrength), 1e-6, 1e6),
+    covPriorScale: clamp(Number.parseFloat($('gmmCovPriorScale')?.value ?? DEFAULTS.covPriorScale), 1e-6, 1e6),
+    covPriorDf: clamp(Number.parseFloat($('gmmCovPriorDf')?.value ?? DEFAULTS.covPriorDf), 0, 1e6),
   };
 }
 
 function collectPoints() {
   const names = [];
-  const kinds = [];
   const points = [];
 
   state.source.names.forEach((name, idx) => {
     names.push(`${name} (source)`);
-    kinds.push('source');
     points.push(state.source.vectors[idx]);
   });
   state.target.names.forEach((name, idx) => {
     names.push(`${name} (target)`);
-    kinds.push('target');
     points.push(state.target.vectors[idx]);
   });
 
-  return {names, kinds, points};
+  return {names, points};
 }
 
 function renderGmmSummary({sampleNames, responsibilities, labels, avg, colOrder, maxProb, bic, aic, logLikelihood}) {
@@ -522,7 +582,7 @@ export async function runGmmModel() {
   const out = $('gmmOutput');
   const wrap = document.createElement('div');
   wrap.className = 'run-block';
-  wrap.innerHTML = `<div class="muted">GMM run • ${escapeHTML(new Date().toLocaleString())} • cov=${escapeHTML(config.covarianceType)} • criterion=${escapeHTML(config.criterion)}</div>`;
+  wrap.innerHTML = `<div class="muted">GMM run • ${escapeHTML(new Date().toLocaleString())} • cov=${escapeHTML(config.covarianceType)} • criterion=${escapeHTML(config.criterion)} • Bayesian priors</div>`;
 
   let result = null;
   if (config.criterion === 'aic' || config.criterion === 'bic') {
@@ -536,6 +596,10 @@ export async function runGmmModel() {
         maxIter: config.maxIter,
         tol: config.tol,
         covarianceType: config.covarianceType,
+        weightPrior: config.weightPrior,
+        meanPriorStrength: config.meanPriorStrength,
+        covPriorScale: config.covPriorScale,
+        covPriorDf: config.covPriorDf,
       });
       results.push(res);
       await yieldToUI();
@@ -548,6 +612,10 @@ export async function runGmmModel() {
       maxIter: config.maxIter,
       tol: config.tol,
       covarianceType: config.covarianceType,
+      weightPrior: config.weightPrior,
+      meanPriorStrength: config.meanPriorStrength,
+      covPriorScale: config.covPriorScale,
+      covPriorDf: config.covPriorDf,
     });
   }
 
@@ -568,6 +636,8 @@ export async function runGmmModel() {
     aic: result.aic,
     logLikelihood: result.logLikelihood,
     covarianceType: result.covarianceType,
+    bayesian: result.bayesian,
+    priors: result.priors,
     sampleNames: names,
   };
 
