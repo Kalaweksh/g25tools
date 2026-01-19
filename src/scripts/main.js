@@ -14,6 +14,7 @@
 */
 import * as distance from './model/distance.js'
 import * as mixture from './model/mixture.js'
+import * as gmm from './model/gmm.js'
 
 
 
@@ -35,7 +36,7 @@ import * as mixture from './model/mixture.js'
       panY: 0,
       zoom: 1,
     },
-    cluster: null, // {k, labels: n, include, axesKey}
+    cluster: null, // {algorithm, k, labels, softLabels, means, covariances, weights, bic, aic, bayesian, priors}
   };
 
   // ----------------------------
@@ -252,6 +253,7 @@ import * as mixture from './model/mixture.js'
       state.cluster = null;
       updateWorkspaceUI();
       distance.hydrateModelControls();
+      gmm.hydrateModelControls();
       //pca.hydrateAnalysisControls();
       // Gate panels
       hide($('modelGate'));
@@ -298,6 +300,7 @@ import * as mixture from './model/mixture.js'
     // Clear outputs
     setHTML($('distanceOutput'), '');
     setHTML($('mixtureOutput'), '');
+    setHTML($('gmmOutput'), '');
     setHTML($('clusterOutput'), '');
     clearCanvas();
   }
@@ -382,6 +385,10 @@ import * as mixture from './model/mixture.js'
     $('runSingle').addEventListener('click', () => mixture.runMixture(true));
     $('runMulti').addEventListener('click', () => mixture.runMixture(false));
     $('clearMixture').addEventListener('click', () => setHTML($('mixtureOutput'), ''));
+
+    // Model: GMM
+    $('runGmm').addEventListener('click', () => gmm.runGmmModel());
+    $('clearGmm').addEventListener('click', () => setHTML($('gmmOutput'), ''));
 
     // Analysis: PCA
     // $('computePCA').addEventListener('click', computePCA);
